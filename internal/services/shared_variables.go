@@ -1,19 +1,26 @@
 package services
 
-var sharedVariables = make(map[string]any)
+type SharedVariables map[string]any
 
-func getSharedVariables() map[string]any {
-	return sharedVariables
+var shared = NewSharedVariables()
+
+func Shared() SharedVariables {
+	return shared
 }
 
-func getSharedVariable(key string) any {
-	return sharedVariables[key]
+func NewSharedVariables() SharedVariables {
+	return make(SharedVariables)
 }
 
-func SetSharedVariable(key string, value string) {
-	sharedVariables[key] = value
+func (sv SharedVariables) Get(key string) (any, bool) {
+	v, ok := sv[key]
+	return v, ok
 }
 
-func DeleteSharedVariable(key string) {
-	delete(sharedVariables, key)
+func (sv SharedVariables) Set(key string, value any) {
+	sv[key] = value
+}
+
+func (sv SharedVariables) Delete(key string) {
+	delete(sv, key)
 }

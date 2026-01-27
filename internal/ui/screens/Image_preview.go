@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"codeberg.org/JoaoGarcia/Mezzotone/internal/services"
 	"codeberg.org/JoaoGarcia/Mezzotone/internal/ui/components"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -41,6 +42,17 @@ func NewImagePreview() ImagePreview {
 }
 
 func (m ImagePreview) Init() tea.Cmd {
+	selectedFile, _ := services.Shared().Get("selectedFile")
+	if selectedFile == nil {
+		err := services.Logger().Error("selected file is nil")
+		if err != nil {
+			panic(err)
+		}
+	}
+	_ = services.Logger().Info(selectedFile.(string))
+	
+	//services.ConvertImageToString()
+
 	return m.loadingAnimation.Spinner.Tick
 }
 
