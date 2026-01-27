@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"codeberg.org/JoaoGarcia/Mezzotone/internal/app"
@@ -17,7 +16,7 @@ func main() {
 
 	p := tea.NewProgram(app.NewRouterModel(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "error:", err)
+		_ = services.Logger().Error(err.Error())
 		os.Exit(1)
 	}
 }

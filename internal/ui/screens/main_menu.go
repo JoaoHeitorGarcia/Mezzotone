@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"codeberg.org/JoaoGarcia/Mezzotone/internal/navigation"
+	"codeberg.org/JoaoGarcia/Mezzotone/internal/services"
 	"codeberg.org/JoaoGarcia/Mezzotone/internal/ui"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -96,6 +97,7 @@ func (m MainMenuScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 			i, ok := m.list.SelectedItem().(item)
 			if ok {
 				m.choice = string(i)
+				_ = services.Logger().Info("Main menu chosen option: " + m.choice)
 				switch m.choice {
 				case "Convert Image":
 					return m, navigation.Navigate(navigation.RouteConvertImageMenu)

@@ -49,9 +49,8 @@ func (m ImagePreview) Init() tea.Cmd {
 			panic(err)
 		}
 	}
-	_ = services.Logger().Info(selectedFile.(string))
-	
-	//services.ConvertImageToString()
+
+	services.ConvertImageToString(selectedFile.(string))
 
 	return m.loadingAnimation.Spinner.Tick
 }

@@ -8,8 +8,9 @@ import (
 )
 
 type FileLogger struct {
-	path string
-	file *os.File
+	path     string
+	file     *os.File
+	maxBytes int64
 }
 
 var logger *FileLogger
@@ -33,7 +34,7 @@ func InitLogger(path string) error {
 		return err
 	}
 
-	logger = &FileLogger{path: abs, file: f}
+	logger = &FileLogger{path: abs, file: f, maxBytes: int64(10 * 1_000 * 1_000)}
 	return nil
 }
 
@@ -48,13 +49,46 @@ func (l *FileLogger) Close() error {
 	return l.file.Close()
 }
 
-func (l *FileLogger) WriteLine(level string, msg string) error {
+func (l *FileLogger) WriteLine(level, msg string) error {
 	if l == nil || l.file == nil {
-		return fmt.Errorf("logger not initialized (call services.InitLogger first)")
+		return fmt.Errorf("logger not initialized")
+	}
+
+	if err := l.maybeTruncate(); err != nil {
+		return err
 	}
 
 	ts := time.Now().Format(time.RFC3339)
 	_, err := fmt.Fprintf(l.file, "%s [%s] %s\n", ts, level, msg)
+	return err
+}
+
+func (l *FileLogger) maybeTruncate() error {
+	if l.maxBytes <= 0 {
+		return nil
+	}
+
+	info, err := l.file.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Size() <= l.maxBytes {
+		return nil
+	}
+
+	if err := l.file.Close(); err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(l.path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	l.file, err = os.OpenFile(l.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	return err
 }
 
