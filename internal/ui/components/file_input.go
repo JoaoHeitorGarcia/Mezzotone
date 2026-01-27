@@ -8,7 +8,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// ClearErrorMsg TODO this maybe could be separated if needed on other components
 type ClearErrorMsg struct{}
 
 type FileInput struct {

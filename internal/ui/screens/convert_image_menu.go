@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/JoaoGarcia/Mezzotone/internal/navigation"
+	"codeberg.org/JoaoGarcia/Mezzotone/internal/services"
 	"codeberg.org/JoaoGarcia/Mezzotone/internal/ui/components"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -13,7 +15,7 @@ type ConvertImageMenuScreen struct {
 	fileInput components.FileInput
 }
 
-const FilePickerHeight = 10
+const FilePickerHeight = 20
 
 func NewConvertImageMenuScreen() ConvertImageMenuScreen {
 	fp := components.NewFileInput(
@@ -43,6 +45,8 @@ func (m ConvertImageMenuScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
 
 	if didSelect, path := m.fileInput.FilePicker.DidSelectFile(msg); didSelect {
 		m.fileInput.SelectedFile = path
+		services.SetSharedVariable("selectedFile", m.fileInput.SelectedFile)
+		return m, navigation.Navigate(navigation.RouteImagePreview)
 	}
 
 	if didSelect, _ := m.fileInput.FilePicker.DidSelectDisabledFile(msg); didSelect {

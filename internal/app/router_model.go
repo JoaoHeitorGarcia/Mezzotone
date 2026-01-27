@@ -26,6 +26,7 @@ func NewRouterModel() RouterModel {
 		screens: map[navigation.Route]screens.Screen{
 			navigation.RouteMainMenu:         screens.NewMainMenuScreen(),
 			navigation.RouteConvertImageMenu: screens.NewConvertImageMenuScreen(),
+			navigation.RouteImagePreview:     screens.NewImagePreview(),
 		},
 		help: help.New(),
 	}
