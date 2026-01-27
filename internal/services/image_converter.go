@@ -1,12 +1,15 @@
 package services
 
-import "os"
+import (
+	"image"
+	"log"
+	"os"
+)
 
-func ConvertImageToString() {
-	filePath := getSharedVariable("selectedFile")
-	file, err := os.ReadFile(filePath.(string))
-	if err != nil {
-		//TODO dont panic :D
-	}
-	//TODO ...
+func ConvertImageToString(filePath string) {
+	imageFile, _ := os.Open(filePath)
+	defer imageFile.Close()
+
+	decodedImage, _, _ := image.Decode(imageFile)
+	log.Print(decodedImage.Bounds())
 }
