@@ -101,6 +101,9 @@ func convertImageCmd() tea.Cmd {
 
 		//TODO: get this from user input
 		services.Shared().Set("textSize", 8)
+		services.Shared().Set("fontAspect", 2)
+		services.Shared().Set("useUnicode", false)
+		services.Shared().Set("directionalRender", false)
 
 		err := services.ConvertImageToString(selectedFile)
 		return services.ConvertDoneMsg{

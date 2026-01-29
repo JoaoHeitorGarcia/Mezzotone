@@ -15,6 +15,8 @@ import (
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
+
+	xdraw "golang.org/x/image/draw"
 )
 
 //const asciiRamp := "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\|()1{}[]?-_+~<>i!lI;:,"^`. "
@@ -25,7 +27,8 @@ type ConvertDoneMsg struct {
 }
 
 func ConvertImageToString(filePath string) error {
-	isDebugEnv, _ := Shared().Get("debug")
+	isDebugEnvAny, _ := Shared().Get("debug")
+	isDebugEnv := isDebugEnvAny.(bool)
 
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -39,27 +42,105 @@ func ConvertImageToString(filePath string) error {
 	if err != nil {
 		return err
 	}
-
-	imgBounds := inputImg.Bounds()
-	imgWidth, imgHeight := imgBounds.Dx(), imgBounds.Dy()
 	_ = Logger().Info("format: " + format)
-	_ = Logger().Info("imgWidth: " + strconv.Itoa(imgWidth) + " imgHeight: " + strconv.Itoa(imgHeight))
 
 	textSizeAny, ok := Shared().Get("textSize")
 	if !ok || textSizeAny == nil {
 		return errors.New("textSize is nil")
 	}
-
 	textSize, ok := textSizeAny.(int)
 	if !ok || textSize <= 0 {
 		textSize = 8
 	}
 
-	fontAspect := 2.0
+	fontAspectAny, ok := Shared().Get("fontAspect")
+	if !ok || fontAspectAny == nil {
+		return errors.New("fontAspect is nil")
+	}
+	fontAspect, ok := fontAspectAny.(float64)
+	if !ok || fontAspect <= 0 {
+		fontAspect = 2
+	}
+
+	grayImg := convertRgbaToGray(inputImg)
+	if isDebugEnv {
+		err := saveImageToDebugDir(grayImg, "grayscale_img", "")
+		if err != nil {
+			return err
+		}
+	}
+
+	cols, rows := gridFromTextSize(grayImg, textSize, fontAspect)
+	gridImage := downScaleToGrid(grayImg, cols, rows)
+	if isDebugEnv {
+		_ = saveImageToDebugDir(gridImage, "grid_gray", "")
+	}
+
+	//TODO if directionalRender is true Sobel filter on `small` (size cols×rows)
+
+	splitImages, err := splitImage(textSize, fontAspect, gridImage, isDebugEnv)
+	if err != nil {
+		return err
+	}
+
+	splitImages[1].Bounds()
+
+	return nil
+}
+
+func convertRgbaToGray(img image.Image) *image.Gray {
+	var (
+		bounds = img.Bounds()
+		gray   = image.NewGray(bounds)
+	)
+	for x := 0; x < bounds.Max.X; x++ {
+		for y := 0; y < bounds.Max.Y; y++ {
+			var rgba = img.At(x, y)
+			gray.Set(x, y, rgba)
+		}
+	}
+	return gray
+}
+
+func gridFromTextSize(img image.Image, textSize int, fontAspect float64) (cols, rows int) {
+	b := img.Bounds()
+	imgW, imgH := b.Dx(), b.Dy()
+
+	charW := textSize
+	charH := int(float64(textSize) * fontAspect)
+	if charW <= 0 {
+		charW = 8
+	}
+	if charH <= 0 {
+		charH = 16
+	}
+
+	cols = imgW / charW
+	rows = imgH / charH
+	if cols < 1 {
+		cols = 1
+	}
+	if rows < 1 {
+		rows = 1
+	}
+
+	return cols, rows
+}
+
+func downScaleToGrid(img image.Image, cols, rows int) *image.Gray {
+	dst := image.NewGray(image.Rect(0, 0, cols, rows))
+	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), xdraw.Over, nil)
+	return dst
+}
+
+func splitImage(textSize int, fontAspect float64, inputImg image.Image, isDebugEnv bool) ([]image.Image, error) {
+
+	imgBounds := inputImg.Bounds()
+	imgWidth, imgHeight := imgBounds.Dx(), imgBounds.Dy()
+	_ = Logger().Info("imgWidth: " + strconv.Itoa(imgWidth) + " imgHeight: " + strconv.Itoa(imgHeight))
+
 	charWidth := textSize
 	charHeight := int(float64(textSize) * fontAspect)
-
-	//TODO DO I NEED TO DOWNSCALE for performance ?
 
 	var rects []image.Rectangle
 	for y := 0; y < imgHeight; y += charHeight {
@@ -80,6 +161,8 @@ func ConvertImageToString(filePath string) error {
 		}
 	}
 
+	//save images to debug folder if flag true
+	var tiles []image.Image
 	for i, r := range rects {
 		var tile image.Image
 
@@ -89,35 +172,33 @@ func ConvertImageToString(filePath string) error {
 			tile = si.SubImage(r)
 		} else {
 			// Fallback: copy crop if subimage fails
-			tile = cropToRGBA(inputImg, r)
+			dst := image.NewRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
+			draw.Draw(dst, dst.Bounds(), inputImg, r.Min, draw.Src)
+			tile = dst
 		}
+		tiles = append(tiles, tile)
 
-		if isDebugEnv.(bool) {
-			err := saveImageToDebugDir(tile, "image_"+strconv.Itoa(i)+".png")
+		//If Debug true - save images
+		if isDebugEnv {
+			err := saveImageToDebugDir(tile, "image_"+strconv.Itoa(i), "cropped_img")
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 
-	return nil
+	return tiles, nil
 }
 
-func cropToRGBA(src image.Image, r image.Rectangle) *image.RGBA {
-	dst := image.NewRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
-	draw.Draw(dst, dst.Bounds(), src, r.Min, draw.Src)
-	return dst
-}
-
-func saveImageToDebugDir(img image.Image, outputName string) error {
+func saveImageToDebugDir(img image.Image, outputName string, subFolderName string) error {
 	if filepath.Ext(outputName) == "" {
 		outputName += ".png"
 	}
-	if err := os.MkdirAll("debugFolder/cropped_img", 0o755); err != nil {
+	if err := os.MkdirAll("debugFolder/"+subFolderName, 0o755); err != nil {
 		return err
 	}
 
-	outPath := filepath.Join("debugFolder/cropped_img", outputName)
+	outPath := filepath.Join("debugFolder/"+subFolderName, outputName)
 	out, err := os.Create(outPath)
 	if err != nil {
 		return err
