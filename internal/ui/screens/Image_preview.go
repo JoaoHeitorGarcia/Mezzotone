@@ -13,11 +13,11 @@ type ImagePreview struct {
 	loadingAnimation components.LoadingScreen
 	loading          bool
 	err              error
-	outputArray      services.ConvertedImageArray
+	outputArray      [][]rune
 }
 
 type ConvertDoneMsg struct {
-	outputArray services.ConvertedImageArray
+	outputArray [][]rune
 	Err         error
 }
 
@@ -92,11 +92,11 @@ func (m ImagePreview) View() string {
 	}
 
 	var outputBuilder strings.Builder
-	for i, r := range m.outputArray.Characters {
-		outputBuilder.WriteRune(r)
-		if m.outputArray.Cols > 0 && (i+1)%m.outputArray.Cols == 0 {
-			outputBuilder.WriteByte('\n')
+	for col := 0; col < len(m.outputArray); col++ {
+		for row := 0; row < len(m.outputArray[col]); row++ {
+			outputBuilder.WriteRune(m.outputArray[col][row])
 		}
+		outputBuilder.WriteByte('\n')
 	}
 
 	return outputBuilder.String()
@@ -115,12 +115,12 @@ func convertImageCmd() tea.Cmd {
 		}
 
 		//TODO: get this from user input
-		services.Shared().Set("textSize", 12)
-		services.Shared().Set("fontAspect", 2)
+		services.Shared().Set("textSize", 2)
+		services.Shared().Set("fontAspect", 2.3)
 		services.Shared().Set("useUnicode", false)
 		services.Shared().Set("directionalRender", false)
 		services.Shared().Set("reverseChars", true)
-		services.Shared().Set("highContrast", false)
+		services.Shared().Set("highContrast", true)
 
 		convertedImage, err := services.ConvertImageToString(selectedFile)
 		if err != nil {
