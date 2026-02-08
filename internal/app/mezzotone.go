@@ -59,7 +59,7 @@ func NewMezzotoneModel() MezzotoneModel {
 		{Label: "Text Size", Key: "textSize", Type: ui.TypeInt, Value: "10"},
 		{Label: "Font Aspect", Key: "fontAspect", Type: ui.TypeFloat, Value: "2.3"},
 		{Label: "Directional Render", Key: "directionalRender", Type: ui.TypeBool, Value: "FALSE"},
-		{Label: "Edge Threshold", Key: "edgeThresholdPercentile", Type: ui.TypeFloat, Value: "0.6"},
+		{Label: "Edge Threshold", Key: "edgeThreshold", Type: ui.TypeFloat, Value: "0.6"},
 		{Label: "Reverse Chars", Key: "reverseChars", Type: ui.TypeBool, Value: "TRUE"},
 		{Label: "High Contrast", Key: "highContrast", Type: ui.TypeBool, Value: "TRUE"},
 		{Label: "Rune Mode", Key: "runeMode", Type: ui.TypeEnum, Value: "ASCII", Enum: runeMode},
@@ -160,6 +160,26 @@ func (m MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, cmd
 				}
 			}
+		case "left":
+			if m.currentActiveMenu == renderViewText {
+				m.renderView.ScrollLeft(1)
+				return m, cmd
+			}
+		case "right":
+			if m.currentActiveMenu == renderViewText {
+				m.renderView.ScrollRight(1)
+				return m, cmd
+			}
+		case "up":
+			if m.currentActiveMenu == renderViewText {
+				m.renderView.ScrollUp(1)
+				return m, cmd
+			}
+		case "down":
+			if m.currentActiveMenu == renderViewText {
+				m.renderView.ScrollDown(1)
+				return m, cmd
+			}
 		}
 	}
 
@@ -240,7 +260,7 @@ func normalizeRenderOptionsForService(settingsValues []ui.SettingItem) services.
 			textSize, _ = strconv.Atoi(item.Value)
 
 		case "fontAspect":
-			edgeThreshold, _ = strconv.ParseFloat(item.Value, 2)
+			fontAspect, _ = strconv.ParseFloat(item.Value, 2)
 
 		case "edgeThreshold":
 			edgeThreshold, _ = strconv.ParseFloat(item.Value, 2)
