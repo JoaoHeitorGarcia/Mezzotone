@@ -13,12 +13,12 @@ Unicode art.
 
 ## ✨ Features
 
--   🖼 Image → ASCII / Unicode rendering\
--   🧠 Edge-aware rendering\
--   🎛 Interactive TUI built with Bubble Tea\
--   🔤 Custom ASCII + extended Unicode ramps\
--   ⚡ High-contrast rendering mode\
--   🧩 Modular rendering pipeline (easy to extend)\
+-   🖼 Image → ASCII / Unicode rendering
+-   🧠 Edge-aware rendering
+-   🎛 Interactive TUI built with Bubble Tea
+-   🔤 Custom ASCII + extended Unicode ramps
+-   ⚡ High-contrast rendering mode
+-   🧩 Modular rendering pipeline (easy to extend)
 -   🧪 Designed for experimentation (ramps, filters, thresholds)
 
 ------------------------------------------------------------------------
