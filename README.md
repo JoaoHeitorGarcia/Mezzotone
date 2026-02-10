@@ -1,4 +1,7 @@
 ![Status: Developing](https://img.shields.io/badge/Status-In_Development-blue)
+[![Version](https://img.shields.io/badge/Version-v.0.0.0-blue.svg)](https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone)
+
+https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone
 
 # 🎨 Mezzotone
 
