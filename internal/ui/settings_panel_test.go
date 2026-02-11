@@ -1,4 +1,4 @@
-package tests
+package ui_test
 
 import (
 	"testing"
