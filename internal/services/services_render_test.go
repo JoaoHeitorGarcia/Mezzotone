@@ -1,4 +1,4 @@
-package tests
+package services_test
 
 import (
 	"path/filepath"
