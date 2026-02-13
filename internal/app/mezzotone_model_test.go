@@ -20,9 +20,9 @@ func TestMezzotoneModelWindowResizeRendersView(t *testing.T) {
 	m := app.NewMezzotoneModel()
 
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	model, ok := updated.(app.MezzotoneModel)
+	model, ok := updated.(*app.MezzotoneModel)
 	if !ok {
-		t.Fatalf("expected updated model type app.MezzotoneModel")
+		t.Fatalf("expected updated model type *app.MezzotoneModel")
 	}
 
 	view := model.View()
@@ -48,15 +48,15 @@ func TestMezzotoneModelEscFromFilePickerReturnsQuitCmd(t *testing.T) {
 func TestMezzotoneModelHelpToggleRendersAndHidesHelp(t *testing.T) {
 	m := app.NewMezzotoneModel()
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	model, ok := updated.(app.MezzotoneModel)
+	model, ok := updated.(*app.MezzotoneModel)
 	if !ok {
-		t.Fatalf("expected updated model type app.MezzotoneModel")
+		t.Fatalf("expected updated model type *app.MezzotoneModel")
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
-	model, ok = updated.(app.MezzotoneModel)
+	model, ok = updated.(*app.MezzotoneModel)
 	if !ok {
-		t.Fatalf("expected updated model type app.MezzotoneModel")
+		t.Fatalf("expected updated model type *app.MezzotoneModel")
 	}
 
 	helpView := model.View()
@@ -65,9 +65,9 @@ func TestMezzotoneModelHelpToggleRendersAndHidesHelp(t *testing.T) {
 	}
 
 	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
-	model, ok = updated.(app.MezzotoneModel)
+	model, ok = updated.(*app.MezzotoneModel)
 	if !ok {
-		t.Fatalf("expected updated model type app.MezzotoneModel")
+		t.Fatalf("expected updated model type *app.MezzotoneModel")
 	}
 
 	viewWithoutHelp := model.View()
