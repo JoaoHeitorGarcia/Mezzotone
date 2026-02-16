@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"codeberg.org/JoaoGarcia/Mezzotone/internal/services"
+	"github.com/JoaoGarcia/Mezzotone/internal/services"
 )
 
 func mustRenderOptions(

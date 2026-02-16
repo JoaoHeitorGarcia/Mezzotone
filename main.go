@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"codeberg.org/JoaoGarcia/Mezzotone/internal/app"
-	"codeberg.org/JoaoGarcia/Mezzotone/internal/services"
+	"github.com/JoaoGarcia/Mezzotone/internal/app"
+	"github.com/JoaoGarcia/Mezzotone/internal/services"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

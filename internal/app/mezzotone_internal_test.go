@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"codeberg.org/JoaoGarcia/Mezzotone/internal/termtext"
+	"github.com/JoaoGarcia/Mezzotone/internal/termtext"
 	"github.com/charmbracelet/bubbles/viewport"
 )
 

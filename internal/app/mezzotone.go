@@ -1,18 +1,21 @@
 package app
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
-	"codeberg.org/JoaoGarcia/Mezzotone/internal/services"
-	"codeberg.org/JoaoGarcia/Mezzotone/internal/termtext"
-	"codeberg.org/JoaoGarcia/Mezzotone/internal/ui"
+	"github.com/JoaoGarcia/Mezzotone/internal/services"
+	"github.com/JoaoGarcia/Mezzotone/internal/termtext"
+	"github.com/JoaoGarcia/Mezzotone/internal/ui"
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.design/x/clipboard"
 )
 
 // TODO REORDER Layout IF TERMINAL width < height
@@ -47,6 +50,7 @@ type styleVariables struct {
 }
 
 var renderSettingsItemsSize int
+var clipboardOK bool
 
 const (
 	filePickerMenu = iota
@@ -103,7 +107,11 @@ func NewMezzotoneModel() *MezzotoneModel {
 		currentActiveMenu: filePickerMenu,
 		helpPreviousMenu:  filePickerMenu,
 	}
-	model.updateMessageViewPortContent("Select image gif or video to convert:", false)
+	model.updateMessageViewPortContent("Select image, gif or video to convert:", false)
+
+	if err := clipboard.Init(); err == nil {
+		clipboardOK = true
+	}
 
 	return model
 }
@@ -139,12 +147,42 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.filePicker.SetHeight(computedFilePickerHeight)
 
-		m.updateMessageViewPortContent("Select image gif or video to convert:", false)
+		m.updateMessageViewPortContent("Select image, gif or video to convert:", false)
 
 		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "c":
+			if m.currentActiveMenu == renderViewText {
+				if !clipboardOK {
+					m.updateMessageViewPortContent("Clipboard not available (init failed)", true)
+					return m, nil
+				}
+
+				clipboard.Write(clipboard.FmtText, []byte(m.renderContent))
+				m.updateMessageViewPortContent("Successfully sent to clipboard !", false)
+				return m, nil
+			}
+		case "e":
+			if m.currentActiveMenu == renderViewText {
+				homeDir, err := os.UserHomeDir()
+				path := filepath.Join(homeDir, "dat2")
+				f, err := os.Create(path)
+				if err != nil {
+					m.updateMessageViewPortContent("⚠ "+err.Error(), true)
+					return m, nil
+				}
+				defer f.Close()
+
+				f.WriteString(m.renderContent)
+				w := bufio.NewWriter(f)
+				w.Flush()
+
+				m.updateMessageViewPortContent("Successfully exported to "+path+" !", false)
+				return m, nil
+
+			}
 		case "h":
 			if m.currentActiveMenu == renderOptionsMenu && m.renderSettings.Editing {
 				break
@@ -192,7 +230,10 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.renderSettings.Editing && m.renderSettings.Confirm {
 					m.incrementCurrentActiveMenu()
 
-					normalizedOptions := normalizeRenderOptionsForService(m.renderSettings.Items)
+					normalizedOptions, err := normalizeRenderOptionsForService(m.renderSettings.Items)
+					if err != nil {
+						m.updateMessageViewPortContent("⚠ "+err.Error(), true)
+					}
 					runeArray, err := services.ConvertImageToString(m.selectedFile, normalizedOptions)
 					if err != nil {
 						m.updateMessageViewPortContent("⚠ "+err.Error(), true)
@@ -298,7 +339,7 @@ func (m *MezzotoneModel) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Left, lefColumnRender, renderViewRender)
 }
 
-func normalizeRenderOptionsForService(settingsValues []ui.SettingItem) services.RenderOptions {
+func normalizeRenderOptionsForService(settingsValues []ui.SettingItem) (services.RenderOptions, error) {
 	var textSize int
 	var fontAspect, edgeThreshold float64
 	var directionalRender, reverseChars, highContrast bool
@@ -330,9 +371,9 @@ func normalizeRenderOptionsForService(settingsValues []ui.SettingItem) services.
 	}
 	options, err := services.NewRenderOptions(textSize, fontAspect, directionalRender, edgeThreshold, reverseChars, highContrast, runeMode)
 	if err != nil {
-		//TODO render Error and go back to renderOptionsMenu
+		return services.RenderOptions{}, err
 	}
-	return options
+	return options, nil
 }
 
 func (m *MezzotoneModel) incrementCurrentActiveMenu() {
@@ -341,13 +382,13 @@ func (m *MezzotoneModel) incrementCurrentActiveMenu() {
 	var messageViewContent string
 	switch m.currentActiveMenu {
 	case filePickerMenu:
-		messageViewContent = "Select image gif or video to convert:"
+		messageViewContent = "Select image, gif or video to convert:"
 		break
 	case renderOptionsMenu:
 		messageViewContent = "Edit render options and confirm:"
 		break
 	case renderViewText:
-		//messageViewContent = "Press C to copy to clipboard"
+		messageViewContent = "Press e to Export or c to copy to clipboard"
 		break
 	}
 
