@@ -146,15 +146,3 @@ Powered by:
 -   Lipgloss --- styling
 
 ------------------------------------------------------------------------
-
-## 🚀 Future Roadmap
-
--   GIF support
--   Video support
-
-### Export
-
--   Text Ouput Export
--   HTML colored ASCII
--   PNG rasterized output
--   Animated ASCII sequences
