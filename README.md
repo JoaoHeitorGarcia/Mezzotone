@@ -12,7 +12,8 @@ https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone
 converts images (and eventually GIFs/videos) into ASCII or
 Unicode art.
 
-2026-02-17-000941_hyprshot.png
+<img width="1920" height="1080" alt="2026-02-17-000941_hyprshot" src="https://github.com/user-attachments/assets/48f48dc1-7e67-4748-8dc8-53195f5bd955" />
+
 
 ------------------------------------------------------------------------
 
