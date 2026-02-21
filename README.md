@@ -12,7 +12,7 @@ https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone
 converts images (and eventually GIFs/videos) into ASCII or
 Unicode art.
 
-<img width="1868" height="1006" alt="image" src="https://github.com/user-attachments/assets/bb427af1-b4c5-4db8-8b4a-2b8f20afcf8b" />
+<img width="1920" height="1080" alt="2026-02-17-000941_hyprshot" src="https://github.com/user-attachments/assets/48f48dc1-7e67-4748-8dc8-53195f5bd955" />
 
 
 ------------------------------------------------------------------------
@@ -146,15 +146,3 @@ Powered by:
 -   Lipgloss --- styling
 
 ------------------------------------------------------------------------
-
-## 🚀 Future Roadmap
-
--   GIF support
--   Video support
-
-### Export
-
--   Text Ouput Export
--   HTML colored ASCII
--   PNG rasterized output
--   Animated ASCII sequences
