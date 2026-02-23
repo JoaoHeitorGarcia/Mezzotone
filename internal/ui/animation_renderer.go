@@ -108,6 +108,12 @@ func (m *AnimationRenderer) GetcurrentFrameIndex() int {
 	return m.currentFrameIndex
 }
 
+func (m *AnimationRenderer) Frames() []AnimationFrame {
+	frames := make([]AnimationFrame, len(m.frames))
+	copy(frames, m.frames)
+	return frames
+}
+
 func nextID() int {
 	return int(atomic.AddInt64(&lastID, 1))
 }

@@ -1,0 +1,233 @@
+package export
+
+import (
+	"fmt"
+	"image"
+	"image/color"
+	"image/color/palette"
+	"image/draw"
+	"image/gif"
+	"os"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+
+	xdraw "golang.org/x/image/draw"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/math/fixed"
+)
+
+type ASCIIGIFFrame struct {
+	ASCII    string
+	Duration time.Duration
+}
+
+func ASCIIFramesToGIF(frames []ASCIIGIFFrame, outPath string, opt ASCIIExportOptions) error {
+	if len(frames) == 0 {
+		return fmt.Errorf("no frames to export")
+	}
+
+	rendered := make([]*image.RGBA, len(frames))
+	workers := runtime.GOMAXPROCS(0)
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > len(frames) {
+		workers = len(frames)
+	}
+
+	jobs := make(chan int, len(frames))
+	var wg sync.WaitGroup
+	var errOnce sync.Once
+	var firstErr error
+
+	setErr := func(err error) {
+		errOnce.Do(func() {
+			firstErr = err
+		})
+	}
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			r, err := newASCIIRenderer(opt)
+			if err != nil {
+				setErr(err)
+				return
+			}
+			defer r.Close()
+
+			for frameIdx := range jobs {
+				img, err := r.Render(frames[frameIdx].ASCII)
+				if err != nil {
+					setErr(err)
+					continue
+				}
+				rendered[frameIdx] = img
+			}
+		}()
+	}
+
+	for i := range frames {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+
+	if firstErr != nil {
+		return firstErr
+	}
+
+	maxW := 1
+	maxH := 1
+	for _, img := range rendered {
+		if img == nil {
+			return fmt.Errorf("failed to render one or more gif frames")
+		}
+		if img.Bounds().Dx() > maxW {
+			maxW = img.Bounds().Dx()
+		}
+		if img.Bounds().Dy() > maxH {
+			maxH = img.Bounds().Dy()
+		}
+	}
+
+	gifFrames := make([]*image.Paletted, 0, len(rendered))
+	delays := make([]int, 0, len(rendered))
+	for i, img := range rendered {
+		canvas := image.NewRGBA(image.Rect(0, 0, maxW, maxH))
+		draw.Draw(canvas, canvas.Bounds(), &image.Uniform{C: opt.BG}, image.Point{}, draw.Src)
+		draw.Draw(canvas, image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()), img, image.Point{}, draw.Over)
+
+		paletted := image.NewPaletted(canvas.Bounds(), palette.Plan9)
+		draw.FloydSteinberg.Draw(paletted, paletted.Rect, canvas, image.Point{})
+		gifFrames = append(gifFrames, paletted)
+
+		delay := int(frames[i].Duration / (10 * time.Millisecond))
+		if delay < 1 {
+			delay = 1
+		}
+		delays = append(delays, delay)
+	}
+
+	f, err := os.Create(outPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	return gif.EncodeAll(f, &gif.GIF{
+		Image: gifFrames,
+		Delay: delays,
+	})
+}
+
+type asciiRenderer struct {
+	opt  ASCIIExportOptions
+	face font.Face
+}
+
+func newASCIIRenderer(opt ASCIIExportOptions) (*asciiRenderer, error) {
+	if opt.DPI <= 0 {
+		opt.DPI = 72
+	}
+	if opt.FontSize <= 0 {
+		opt.FontSize = 14
+	}
+	if opt.BG == nil {
+		opt.BG = color.Black
+	}
+	if opt.FG == nil {
+		opt.FG = color.White
+	}
+
+	tt, err := opentype.Parse(Font)
+	if err != nil {
+		return nil, err
+	}
+
+	face, err := opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    opt.FontSize,
+		DPI:     opt.DPI,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &asciiRenderer{
+		opt:  opt,
+		face: face,
+	}, nil
+}
+
+func (r *asciiRenderer) Close() {
+	if r.face != nil {
+		_ = r.face.Close()
+	}
+}
+
+func (r *asciiRenderer) Render(ascii string) (*image.RGBA, error) {
+	lines := strings.Split(strings.ReplaceAll(ascii, "\r\n", "\n"), "\n")
+	d := &font.Drawer{Face: r.face}
+
+	maxW := 0
+	for _, line := range lines {
+		w := d.MeasureString(line).Round()
+		if w > maxW {
+			maxW = w
+		}
+	}
+	metrics := r.face.Metrics()
+	lineH := metrics.Height.Round()
+	ascent := metrics.Ascent.Round()
+
+	w := maxW
+	h := lineH * len(lines)
+	if w < 1 {
+		w = 1
+	}
+	if h < 1 {
+		h = 1
+	}
+
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: r.opt.BG}, image.Point{}, draw.Src)
+
+	d = &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(r.opt.FG),
+		Face: r.face,
+	}
+
+	y := ascent
+	for _, line := range lines {
+		d.Dot = fixed.P(0, y)
+		d.DrawString(line)
+		y += lineH
+	}
+
+	if r.opt.TargetAspect > 0 {
+		advM := d.MeasureString("M").Round()
+		if advM > 0 && lineH > 0 {
+			currentAspect := float64(advM) / float64(lineH)
+			scaleX := r.opt.TargetAspect / currentAspect
+
+			if scaleX > 0.01 && scaleX < 100 {
+				newW := int(float64(img.Bounds().Dx()) * scaleX)
+				if newW < 1 {
+					newW = 1
+				}
+				scaled := image.NewRGBA(image.Rect(0, 0, newW, img.Bounds().Dy()))
+				xdraw.ApproxBiLinear.Scale(scaled, scaled.Bounds(), img, img.Bounds(), draw.Over, nil)
+				img = scaled
+			}
+		}
+	}
+
+	return img, nil
+}
