@@ -1,4 +1,4 @@
-[![Version](https://img.shields.io/badge/Version-v.0.1.0-blue.svg)](https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone)
+[![Version](https://img.shields.io/badge/Version-v.0.2.0-blue.svg)](https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone)
 [![Status](https://img.shields.io/badge/Powered_by-Bubble_Tea-7a4a8f)](https://github.com/charmbracelet/bubbletea?tab=readme-ov-file)
 
 # 🎨 Mezzotone
