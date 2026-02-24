@@ -1,5 +1,5 @@
-[![Version](https://img.shields.io/badge/Version-v.0.1.0-blue.svg)](https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone)
-[![Status](https://img.shields.io/badge/Powered_by-Bubble_Tea-7a4a8f)](https://github.com/charmbracelet/bubbletea?tab=readme-ov-file)
+[![Version](https://img.shields.io/badge/Version-v.0.2.0-blue.svg)](https://github.com/JoaoHeitorGarcia/Mezzotone/releases/tag/Mezzotone)
+[![Status](https://img.shields.io/badge/Powered_by-Go_|_Bubble_Tea-7a4a8f)](https://github.com/charmbracelet/bubbletea?tab=readme-ov-file)
 
 # 🎨 Mezzotone
 
@@ -7,7 +7,7 @@
 > Bubble Tea
 
 **Mezzotone** is a terminal UI (TUI) application written in Go that
-converts images (and eventually GIFs/videos) into ASCII or
+converts images or gifs into ASCII or
 Unicode art.
 
 <img width="1920" height="1080" alt="2026-02-17-000941_hyprshot" src="https://github.com/user-attachments/assets/48f48dc1-7e67-4748-8dc8-53195f5bd955" />
