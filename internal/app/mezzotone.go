@@ -8,8 +8,10 @@ import (
 	"image/gif"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"Mezzotone/internal/export"
@@ -69,6 +71,12 @@ type styleVariables struct {
 
 var renderSettingsItemsSize int
 var clipboardOK bool
+var clipboardWrite = clipboard.Write
+var clipboardCommands = [][]string{
+	{"wl-copy"},
+	{"xclip", "-selection", "clipboard"},
+	{"xsel", "--clipboard", "--input"},
+}
 var newUUID = uuid.New
 
 const (
@@ -205,12 +213,10 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "c":
 			if m.currentActiveMenu == renderView {
-				if !clipboardOK {
-					m.updateMessageViewPortContent("Clipboard not available (init failed)", true)
+				if err := copyTextToClipboard(m.renderContent); err != nil {
+					m.updateMessageViewPortContent("⚠ "+err.Error(), true)
 					return m, nil
 				}
-
-				clipboard.Write(clipboard.FmtText, []byte(m.renderContent))
 				m.updateMessageViewPortContent("Successfully sent to clipboard !", false)
 				return m, nil
 			}
@@ -793,6 +799,32 @@ func exportAsciiToPngCmd(outPath, renderContent string, exportOptions export.ASC
 		}
 		return msg
 	}
+}
+
+func copyTextToClipboard(content string) error {
+	cleanContent := content
+	if len(cleanContent) == 0 {
+		return fmt.Errorf("nothing to copy (render output is empty)")
+	}
+
+	if clipboardOK {
+		if changed := clipboardWrite(clipboard.FmtText, []byte(cleanContent)); changed != nil {
+			return nil
+		}
+	}
+
+	for _, command := range clipboardCommands {
+		if len(command) == 0 {
+			continue
+		}
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Stdin = strings.NewReader(cleanContent)
+		if err := cmd.Run(); err == nil {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("clipboard not available (init failed)")
 }
 
 func (m *MezzotoneModel) toggleRenderViewFullscreen() {
