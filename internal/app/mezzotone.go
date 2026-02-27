@@ -73,6 +73,7 @@ type renderedImgOutput struct {
 type renderedGifOutput struct {
 	renderedRunes [][][]rune
 	renderedColor [][][]color.NRGBA
+	delayTimes    []time.Duration
 }
 
 type styleVariables struct {
@@ -292,40 +293,43 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, exportAsciiToPngCmd(outPath, render, exportOptions)
 			}
-		//case "g":
-		//	if m.currentActiveMenu == renderView {
-		//		homeDir, _ := os.UserHomeDir()
-		//		generatedUuid := newUUID()
-		//		outPath := filepath.Join(homeDir, "Mezzotone_"+generatedUuid.String()+".gif")
-		//
-		//		fontAspect := 1.0
-		//		for i := range m.renderSettings.Items {
-		//			if m.renderSettings.Items[i].Key == "fontAspect" {
-		//				fontAspect, _ = strconv.ParseFloat(m.renderSettings.Items[i].Value, 2)
-		//			}
-		//		}
-		//
-		//		// Font Aspect is height/width (2.3). Export wants width/height.
-		//		targetAspect := 1.0 / fontAspect
-		//
-		//		exportOptions := export.ASCIIExportOptions{
-		//			FontSize:     14,
-		//			DPI:          300,
-		//			BG:           color.Black,
-		//			FG:           color.White,
-		//			TargetAspect: targetAspect,
-		//		}
-		//
-		//		gifFrames := make([]export.ASCIIGIFFrame, 0, len(m.asciiGIFFrames))
-		//		for _, frame := range m.asciiGIFFrames {
-		//			gifFrames = append(gifFrames, export.ASCIIGIFFrame{
-		//				ASCII:    frame.Frame,
-		//				Duration: frame.Duration,
-		//			})
-		//		}
-		//		m.updateMessageViewPortContent("Exporting gif to "+outPath+" ...", false)
-		//		return m, exportAsciiToGifCmd(outPath, m.renderContent, gifFrames, exportOptions)
-		//	}
+		case "g":
+			if m.currentActiveMenu == renderView {
+				homeDir, _ := os.UserHomeDir()
+				generatedUuid := newUUID()
+				outPath := filepath.Join(homeDir, "Mezzotone_"+generatedUuid.String()+".gif")
+
+				fontAspect := 1.0
+				for i := range m.renderSettings.Items {
+					if m.renderSettings.Items[i].Key == "fontAspect" {
+						fontAspect, _ = strconv.ParseFloat(m.renderSettings.Items[i].Value, 2)
+					}
+				}
+
+				// Font Aspect is height/width (2.3). Export wants width/height.
+				targetAspect := 1.0 / fontAspect
+
+				exportOptions := export.ASCIIExportOptions{
+					FontSize:     14,
+					DPI:          300,
+					BG:           color.Black,
+					FG:           color.White,
+					TargetAspect: targetAspect,
+					RenderColor:  m.getRenderColor(),
+				}
+
+				gifFrames := make([]export.ASCIIGIFFrame, 0, len(m.renderedGifOutput.renderedRunes))
+				for i := range m.renderedGifOutput.renderedRunes {
+					gifFrames = append(gifFrames, export.ASCIIGIFFrame{
+						FrameRunes:  m.renderedGifOutput.renderedRunes[i],
+						Duration:    m.renderedGifOutput.delayTimes[i],
+						FrameColors: m.renderedGifOutput.renderedColor[i],
+					})
+				}
+
+				m.updateMessageViewPortContent("Exporting gif to "+outPath+" ...", false)
+				return m, exportAsciiToGifCmd(outPath, gifFrames, exportOptions)
+			}
 		case "h":
 			if m.currentActiveMenu == renderOptionsMenu && m.renderSettings.Editing {
 				break
@@ -384,16 +388,15 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					_ = services.Logger().Info(fmt.Sprintf("Successfully Loaded: %s", m.selectedFile))
 
-					if IsGIF(m.selectedFile) {
-						frameArray, delays, err := SplitAnimatedGIF(f)
-						if err != nil {
-							m.updateMessageViewPortContent("⚠ "+err.Error(), true)
-							return m, cmd
-						}
-
-						var gifRuneArrays [][][]rune
-						var gifColorArrays [][][]color.NRGBA
-						for _, frame := range frameArray {
+						if IsGIF(m.selectedFile) {
+							frameArray, delays, err := SplitAnimatedGIF(f)
+							if err != nil {
+								m.updateMessageViewPortContent("⚠ "+err.Error(), true)
+								return m, cmd
+							}
+							var gifRuneArrays [][][]rune
+							var gifColorArrays [][][]color.NRGBA
+						for i, frame := range frameArray {
 							runeArray, colorArray, err := services.ConvertImageToString(frame, normalizedOptions)
 							if err != nil {
 								m.updateMessageViewPortContent("⚠ "+err.Error(), true)
@@ -404,6 +407,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 							m.renderedGifOutput.renderedRunes = append(m.renderedGifOutput.renderedRunes, runeArray)
 							m.renderedGifOutput.renderedColor = append(m.renderedGifOutput.renderedColor, colorArray)
+							m.renderedGifOutput.delayTimes = append(m.renderedGifOutput.delayTimes, time.Duration(delays[i])*10*time.Millisecond)
 						}
 
 						var animationFrames []ui.AnimationFrame
@@ -444,12 +448,10 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, cmd
 					}
 
-					m.renderedImgOutput.renderedRunes = runeArray
-					m.renderedImgOutput.renderedColor = colorArray
+						m.renderedImgOutput.renderedRunes = runeArray
+						m.renderedImgOutput.renderedColor = colorArray
 
-					m.gifAnimation.StopAnimation()
-					m.renderedGifOutput.renderedRunes = nil
-					m.renderedGifOutput.renderedColor = nil
+							m.gifAnimation.StopAnimation()
 
 					m.renderContent = services.ImageRuneArrayIntoString(runeArray, colorArray, normalizedOptions.RenderColor)
 					_ = services.Logger().Info(fmt.Sprintf("%s", m.renderContent))
@@ -724,7 +726,7 @@ func IsGIF(path string) bool {
 	return format == "gif"
 }
 
-// SplitAnimatedGIF decodes an animated GIF and returns frames plus per-frame delays.
+// SplitAnimatedGIF decodes an animated GIF and returns frames plus per-frame delayTimes.
 // GIF frames are often partial/offset “patches”, so we simulate playback by drawing each frame onto a
 // full-size RGBA canvas and then clone the canvas after each draw so frames don’t share the same pixel buffer.
 func SplitAnimatedGIF(r io.Reader) (frames []image.Image, delays []int, err error) {
@@ -796,7 +798,7 @@ func cloneRGBA(src *image.RGBA) *image.RGBA {
 	return dst
 }
 
-func exportAsciiToGifCmd(outPath, renderContent string, frames []export.ASCIIGIFFrame, exportOptions export.ASCIIExportOptions) tea.Cmd {
+func exportAsciiToGifCmd(outPath string, frames []export.ASCIIGIFFrame, exportOptions export.ASCIIExportOptions) tea.Cmd {
 	return func() (msg tea.Msg) {
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -807,16 +809,14 @@ func exportAsciiToGifCmd(outPath, renderContent string, frames []export.ASCIIGIF
 			}
 		}()
 
-		var err error
 		if len(frames) == 0 {
-			frames = []export.ASCIIGIFFrame{
-				{
-					ASCII:    renderContent,
-					Duration: 100 * time.Millisecond,
-				},
+			return gifExportDoneMsg{
+				outPath: outPath,
+				err:     fmt.Errorf("no rendered gif frames available to export"),
 			}
 		}
-		err = export.ASCIIFramesToGIF(frames, outPath, exportOptions)
+
+		err := export.ASCIIFramesToGIF(frames, outPath, exportOptions)
 
 		msg = gifExportDoneMsg{
 			outPath: outPath,
