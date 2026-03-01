@@ -80,6 +80,33 @@ type styleVariables struct {
 	windowMargin           int
 	leftColumnWidth        int
 	isRenderViewFullscreen bool
+
+	styleColors styleColors
+
+	renderViewStyle     lipgloss.Style
+	filePickerStyle     filePickerStyle
+	renderSettingsStyle renderSettingsStyle
+	messageViewStyle    lipgloss.Style
+}
+
+type filePickerStyle struct {
+	renderStyle             lipgloss.Style
+	filePickerActiveStyle   filepicker.Styles
+	filePickerInactiveStyle filepicker.Styles
+}
+
+type renderSettingsStyle struct {
+	renderStyle                lipgloss.Style
+	settingsPanelActiveStyle   ui.RenderSettingsStyles
+	settingsPanelInactiveStyle ui.RenderSettingsStyles
+}
+
+type styleColors struct {
+	activeColor        lipgloss.Color
+	activeColorLight   lipgloss.Color
+	activeColorDark    lipgloss.Color
+	activeColorVariant lipgloss.Color
+	inactiveColor      lipgloss.Color
 }
 
 var renderSettingsItemsSize int
@@ -101,10 +128,83 @@ const (
 )
 
 func NewMezzotoneModel() *MezzotoneModel {
+	modelStyleColors := styleColors{
+		activeColor:        lipgloss.Color("39"),
+		activeColorLight:   lipgloss.Color("153"),
+		activeColorDark:    lipgloss.Color("105"),
+		activeColorVariant: lipgloss.Color("209"),
+		inactiveColor:      lipgloss.Color("247"),
+	}
+
+	renderViewStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder())
+
+	messageViewStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder())
+
+	noFilesFoundString := "Oops. No Files Found."
+	filePickerStyles := filePickerStyle{
+		renderStyle: lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()),
+		filePickerActiveStyle: filepicker.Styles{
+			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.activeColorVariant),
+			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
+			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
+			File:             lipgloss.NewStyle().Foreground(modelStyleColors.activeColorLight),
+			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.activeColorVariant).Bold(true),
+			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).Width(7).Align(lipgloss.Right),
+			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).PaddingLeft(2).SetString(noFilesFoundString),
+		},
+		filePickerInactiveStyle: filepicker.Styles{
+			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			File:             lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).Width(7).Align(lipgloss.Right),
+			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).PaddingLeft(2).SetString(noFilesFoundString),
+		},
+	}
+
+	renderSettingsStyles := renderSettingsStyle{
+		renderStyle: lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			Padding(1, 2),
+		settingsPanelActiveStyle: ui.RenderSettingsStyles{
+			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
+			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.activeColorLight),
+			SelectedStyle:   lipgloss.NewStyle().Foreground(modelStyleColors.activeColorVariant).Reverse(true),
+			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
+			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.activeColorLight),
+		},
+		settingsPanelInactiveStyle: ui.RenderSettingsStyles{
+			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			SelectedStyle:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).Reverse(true),
+			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+		},
+	}
+
 	windowStyles := styleVariables{
 		windowMargin:           2,
 		leftColumnWidth:        10,
 		isRenderViewFullscreen: false,
+
+		styleColors: modelStyleColors,
+
+		renderViewStyle:     renderViewStyle,
+		messageViewStyle:    messageViewStyle,
+		filePickerStyle:     filePickerStyles,
+		renderSettingsStyle: renderSettingsStyles,
 	}
 
 	runeMode := []string{"ASCII", "UNICODE", "DOTS", "RECTANGLES", "BARS"}
@@ -119,7 +219,7 @@ func NewMezzotoneModel() *MezzotoneModel {
 		{Label: "Rune Mode", Key: "runeMode", Type: ui.TypeEnum, Value: "ASCII", Enum: runeMode},
 	}
 	renderSettingsItemsSize = len(renderSettingsItems)
-	renderSettingsModel := ui.NewSettingsPanel("Render Options", renderSettingsItems)
+	renderSettingsModel := ui.NewSettingsPanel("Render Options", renderSettingsItems, windowStyles.renderSettingsStyle.settingsPanelInactiveStyle)
 	renderSettingsModel.ClearActive()
 
 	fp := filepicker.New()
@@ -136,6 +236,7 @@ func NewMezzotoneModel() *MezzotoneModel {
 		Open:     key.NewBinding(key.WithKeys("right", "enter"), key.WithHelp("l", "open")),
 		Select:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
 	}
+	fp.Styles = windowStyles.filePickerStyle.filePickerActiveStyle
 
 	renderViewPort := viewport.New(0, 0)
 	leftColumn := viewport.New(0, 0)
@@ -388,14 +489,14 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					_ = services.Logger().Info(fmt.Sprintf("Successfully Loaded: %s", m.selectedFile))
 
-						if IsGIF(m.selectedFile) {
-							frameArray, delays, err := SplitAnimatedGIF(f)
-							if err != nil {
-								m.updateMessageViewPortContent("⚠ "+err.Error(), true)
-								return m, cmd
-							}
-							var gifRuneArrays [][][]rune
-							var gifColorArrays [][][]color.NRGBA
+					if IsGIF(m.selectedFile) {
+						frameArray, delays, err := SplitAnimatedGIF(f)
+						if err != nil {
+							m.updateMessageViewPortContent("⚠ "+err.Error(), true)
+							return m, cmd
+						}
+						var gifRuneArrays [][][]rune
+						var gifColorArrays [][][]color.NRGBA
 						for i, frame := range frameArray {
 							runeArray, colorArray, err := services.ConvertImageToString(frame, normalizedOptions)
 							if err != nil {
@@ -448,10 +549,10 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, cmd
 					}
 
-						m.renderedImgOutput.renderedRunes = runeArray
-						m.renderedImgOutput.renderedColor = colorArray
+					m.renderedImgOutput.renderedRunes = runeArray
+					m.renderedImgOutput.renderedColor = colorArray
 
-							m.gifAnimation.StopAnimation()
+					m.gifAnimation.StopAnimation()
 
 					m.renderContent = services.ImageRuneArrayIntoString(runeArray, colorArray, normalizedOptions.RenderColor)
 					_ = services.Logger().Info(fmt.Sprintf("%s", m.renderContent))
@@ -568,30 +669,33 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *MezzotoneModel) View() string {
+	switch m.currentActiveMenu {
+	case renderView:
+		m.filePicker.Styles = m.style.filePickerStyle.filePickerInactiveStyle
+		m.renderSettings.Styles = m.style.renderSettingsStyle.settingsPanelInactiveStyle
+	case renderOptionsMenu:
+		m.filePicker.Styles = m.style.filePickerStyle.filePickerInactiveStyle
+		m.renderSettings.Styles = m.style.renderSettingsStyle.settingsPanelActiveStyle
+	case filePickerMenu:
+		m.filePicker.Styles = m.style.filePickerStyle.filePickerActiveStyle
+		m.renderSettings.Styles = m.style.renderSettingsStyle.settingsPanelInactiveStyle
+	}
 
 	if m.style.isRenderViewFullscreen {
-		renderViewStyle := lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder())
-		return renderViewStyle.Render(m.renderView.View())
+		return m.style.renderViewStyle.Render(m.renderView.View())
 	}
 
 	innerW := m.style.leftColumnWidth - 2
-	messageViewportRenderStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		Width(m.style.leftColumnWidth)
-	messageViewportRender := messageViewportRenderStyle.Render(m.messageViewPort.View())
+	messageViewportRender := m.style.messageViewStyle.Width(m.style.leftColumnWidth).Render(m.messageViewPort.View())
 
-	filePickerStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		Width(m.style.leftColumnWidth)
 	fpView := termtext.TruncateLinesANSI(m.filePicker.View(), innerW)
-	filePickerRender := filePickerStyle.Render(fpView)
+	filePickerRender := m.style.filePickerStyle.renderStyle.Width(m.style.leftColumnWidth).Render(fpView)
 
-	lefColumnRender := lipgloss.JoinVertical(lipgloss.Top, messageViewportRender, filePickerRender, m.renderSettings.View())
+	renderSettingsRender := m.style.renderSettingsStyle.renderStyle.Width(m.style.leftColumnWidth).Render(m.renderSettings.View())
 
-	renderViewStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder())
-	renderViewRender := renderViewStyle.Render(m.renderView.View())
+	lefColumnRender := lipgloss.JoinVertical(lipgloss.Top, messageViewportRender, filePickerRender, renderSettingsRender)
+
+	renderViewRender := m.style.renderViewStyle.Render(m.renderView.View())
 
 	return lipgloss.JoinHorizontal(lipgloss.Left, lefColumnRender, renderViewRender)
 }
@@ -727,7 +831,7 @@ func IsGIF(path string) bool {
 }
 
 // SplitAnimatedGIF decodes an animated GIF and returns frames plus per-frame delayTimes.
-// GIF frames are often partial/offset “patches”, so we simulate playback by drawing each frame onto a
+// GIF frames are often partial/offset “patches”, so playback is simulated by drawing each frame onto a
 // full-size RGBA canvas and then clone the canvas after each draw so frames don’t share the same pixel buffer.
 func SplitAnimatedGIF(r io.Reader) (frames []image.Image, delays []int, err error) {
 	defer func() {

@@ -29,6 +29,15 @@ type SettingItem struct {
 	Enum  []string
 }
 
+type RenderSettingsStyles struct {
+	BoxStyle        lipgloss.Style
+	TitleStyle      lipgloss.Style
+	LabelStyle      lipgloss.Style
+	ValueStyle      lipgloss.Style
+	SelectedStyle   lipgloss.Style
+	ConfirmBtnStyle lipgloss.Style
+}
+
 type SettingsPanel struct {
 	Title string
 	Items []SettingItem
@@ -41,17 +50,20 @@ type SettingsPanel struct {
 
 	input         textinput.Model
 	width, height int
+
+	Styles RenderSettingsStyles
 }
 
-func NewSettingsPanel(title string, items []SettingItem) SettingsPanel {
+func NewSettingsPanel(title string, items []SettingItem, styles RenderSettingsStyles) SettingsPanel {
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.CharLimit = 64
 
 	return SettingsPanel{
-		Title: title,
-		Items: items,
-		input: ti,
+		Title:  title,
+		Items:  items,
+		input:  ti,
+		Styles: styles,
 	}
 }
 
@@ -174,20 +186,6 @@ func (m *SettingsPanel) Update(msg tea.Msg) (SettingsPanel, tea.Cmd) {
 }
 
 func (m *SettingsPanel) View() string {
-	box := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		Padding(1, 2).
-		Width(m.width)
-
-	title := lipgloss.NewStyle().
-		Bold(true).
-		Render(strings.ToUpper(m.Title))
-
-	labelStyle := lipgloss.NewStyle()
-	valueStyle := lipgloss.NewStyle()
-
-	selected := lipgloss.NewStyle().Reverse(true)
-
 	innerW := max(1, m.width-2-4 /*border + padding left+right*/)
 	gapW := 2
 
@@ -195,7 +193,7 @@ func (m *SettingsPanel) View() string {
 	valueW := min(10, max(1, innerW/3))
 	labelW := max(1, innerW-gapW-valueW)
 
-	lines := []string{title, ""}
+	lines := []string{m.Styles.TitleStyle.Render(termtext.TruncateLinesANSI(strings.ToUpper(m.Title), labelW)), ""}
 
 	for i, it := range m.Items {
 		val := it.Value
@@ -204,22 +202,22 @@ func (m *SettingsPanel) View() string {
 			val = m.input.View()
 		}
 
-		left := labelStyle.MaxWidth(labelW).Width(labelW).Render(termtext.TruncateLinesANSI(it.Label, labelW))
-		right := valueStyle.Width(valueW).Render(val)
+		left := m.Styles.LabelStyle.MaxWidth(labelW).Width(labelW).Render(termtext.TruncateLinesANSI(it.Label, labelW))
+		right := m.Styles.ValueStyle.Width(valueW).Render(termtext.TruncateLinesANSI(val, valueW))
 
 		row := left + strings.Repeat(" ", gapW) + right
 		if i == m.cursor {
-			row = selected.Render(row)
+			row = m.Styles.SelectedStyle.Render(row)
 		}
 		lines = append(lines, row)
 	}
 
-	confirmButton := labelStyle.Width(labelW + valueW).Render("CONFIRM")
+	confirmButton := m.Styles.ConfirmBtnStyle.Width(labelW + valueW).Render(termtext.TruncateLinesANSI("CONFIRM", labelW))
 	if m.cursor == len(m.Items) {
-		confirmButton = selected.Render(confirmButton)
+		confirmButton = m.Styles.SelectedStyle.Render(confirmButton)
 	}
 	lines = append(lines, "\n"+confirmButton)
-	return box.Render(strings.Join(lines, "\n"))
+	return m.Styles.BoxStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (m *SettingsPanel) toggleBool() {
