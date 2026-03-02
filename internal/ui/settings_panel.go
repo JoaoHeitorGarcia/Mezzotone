@@ -202,18 +202,26 @@ func (m *SettingsPanel) View() string {
 			val = m.input.View()
 		}
 
-		left := m.Styles.LabelStyle.MaxWidth(labelW).Width(labelW).Render(termtext.TruncateLinesANSI(it.Label, labelW))
-		right := m.Styles.ValueStyle.Width(valueW).Render(termtext.TruncateLinesANSI(val, valueW))
+		leftText := termtext.TruncateLinesANSI(it.Label, labelW)
+		rightText := termtext.TruncateLinesANSI(val, valueW)
+
+		left := m.Styles.LabelStyle.MaxWidth(labelW).Width(labelW).Render(leftText)
+		right := m.Styles.ValueStyle.Width(valueW).Render(rightText)
 
 		row := left + strings.Repeat(" ", gapW) + right
 		if i == m.cursor {
+			left = lipgloss.NewStyle().MaxWidth(labelW).Width(labelW).Render(leftText)
+			right = lipgloss.NewStyle().Width(valueW).Render(rightText)
+			row = left + strings.Repeat(" ", gapW) + right
 			row = m.Styles.SelectedStyle.Render(row)
 		}
 		lines = append(lines, row)
 	}
 
-	confirmButton := m.Styles.ConfirmBtnStyle.Width(labelW + valueW).Render(termtext.TruncateLinesANSI("CONFIRM", labelW))
+	confirmText := termtext.TruncateLinesANSI("CONFIRM", labelW)
+	confirmButton := m.Styles.ConfirmBtnStyle.Width(labelW + valueW).Render(confirmText)
 	if m.cursor == len(m.Items) {
+		confirmButton = lipgloss.NewStyle().Width(labelW + valueW).Render(confirmText)
 		confirmButton = m.Styles.SelectedStyle.Render(confirmButton)
 	}
 	lines = append(lines, "\n"+confirmButton)

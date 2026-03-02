@@ -86,7 +86,7 @@ type styleVariables struct {
 	renderViewStyle     lipgloss.Style
 	filePickerStyle     filePickerStyle
 	renderSettingsStyle renderSettingsStyle
-	messageViewStyle    lipgloss.Style
+	messageViewStyle    messageViewStyle
 }
 
 type filePickerStyle struct {
@@ -101,12 +101,20 @@ type renderSettingsStyle struct {
 	settingsPanelInactiveStyle ui.RenderSettingsStyles
 }
 
+type messageViewStyle struct {
+	renderStyle  lipgloss.Style
+	messageStyle lipgloss.Style
+	errorStyle   lipgloss.Style
+	helpStyle    lipgloss.Style
+}
+
 type styleColors struct {
-	activeColor        lipgloss.Color
-	activeColorLight   lipgloss.Color
-	activeColorDark    lipgloss.Color
-	activeColorVariant lipgloss.Color
-	inactiveColor      lipgloss.Color
+	white  lipgloss.Color
+	purple lipgloss.Color
+	pink   lipgloss.Color
+	gray   lipgloss.Color
+	black  lipgloss.Color
+	red    lipgloss.Color
 }
 
 var renderSettingsItemsSize int
@@ -129,48 +137,56 @@ const (
 
 func NewMezzotoneModel() *MezzotoneModel {
 	modelStyleColors := styleColors{
-		activeColor:        lipgloss.Color("39"),
-		activeColorLight:   lipgloss.Color("153"),
-		activeColorDark:    lipgloss.Color("105"),
-		activeColorVariant: lipgloss.Color("209"),
-		inactiveColor:      lipgloss.Color("247"),
+		white:  lipgloss.Color("255"),
+		purple: lipgloss.Color("99"),
+		pink:   lipgloss.Color("213"),
+		gray:   lipgloss.Color("247"),
+		black:  lipgloss.Color("232"),
+		red:    lipgloss.Color("9"),
 	}
 
 	renderViewStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.NormalBorder())
 
-	messageViewStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder())
+	messageViewStyles := messageViewStyle{
+		renderStyle: lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()),
+		messageStyle: lipgloss.NewStyle().Foreground(modelStyleColors.pink),
+		errorStyle: lipgloss.NewStyle().
+			Foreground(modelStyleColors.red),
+		helpStyle: lipgloss.NewStyle().
+			Faint(true),
+	}
 
 	noFilesFoundString := "Oops. No Files Found."
 	filePickerStyles := filePickerStyle{
 		renderStyle: lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()),
 		filePickerActiveStyle: filepicker.Styles{
-			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.activeColorVariant),
-			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
-			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
-			File:             lipgloss.NewStyle().Foreground(modelStyleColors.activeColorLight),
-			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.activeColorVariant).Bold(true),
-			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).Width(7).Align(lipgloss.Right),
-			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).PaddingLeft(2).SetString(noFilesFoundString),
+			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.pink),
+			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.purple),
+			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.purple),
+			File:             lipgloss.NewStyle().Foreground(modelStyleColors.white),
+			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.pink).Bold(true).Reverse(true),
+			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.gray).Width(7).Align(lipgloss.Right),
+			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.gray).PaddingLeft(2).SetString(noFilesFoundString),
 		},
 		filePickerInactiveStyle: filepicker.Styles{
-			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			File:             lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).Width(7).Align(lipgloss.Right),
-			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).PaddingLeft(2).SetString(noFilesFoundString),
+			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			File:             lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.gray).Width(7).Align(lipgloss.Right),
+			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.gray).PaddingLeft(2).SetString(noFilesFoundString),
 		},
 	}
 
@@ -179,18 +195,18 @@ func NewMezzotoneModel() *MezzotoneModel {
 			BorderStyle(lipgloss.NormalBorder()).
 			Padding(1, 2),
 		settingsPanelActiveStyle: ui.RenderSettingsStyles{
-			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
-			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.activeColorLight),
-			SelectedStyle:   lipgloss.NewStyle().Foreground(modelStyleColors.activeColorVariant).Reverse(true),
-			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.activeColorDark),
-			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.activeColorLight),
+			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.purple),
+			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.white),
+			SelectedStyle:   lipgloss.NewStyle().Background(modelStyleColors.pink).Foreground(modelStyleColors.black).Bold(true),
+			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.pink).Bold(true),
+			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.pink).Bold(true),
 		},
 		settingsPanelInactiveStyle: ui.RenderSettingsStyles{
-			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			SelectedStyle:   lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor).Reverse(true),
-			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
-			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.inactiveColor),
+			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			SelectedStyle:   lipgloss.NewStyle().Foreground(modelStyleColors.gray).Reverse(true),
+			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.gray),
 		},
 	}
 
@@ -202,7 +218,7 @@ func NewMezzotoneModel() *MezzotoneModel {
 		styleColors: modelStyleColors,
 
 		renderViewStyle:     renderViewStyle,
-		messageViewStyle:    messageViewStyle,
+		messageViewStyle:    messageViewStyles,
 		filePickerStyle:     filePickerStyles,
 		renderSettingsStyle: renderSettingsStyles,
 	}
@@ -326,6 +342,9 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.style.isRenderViewFullscreen && msg.String() != "f" && msg.String() != "ctrl+c" {
+			return m, nil
+		}
 		switch msg.String() {
 		case "c":
 			if m.currentActiveMenu == renderView {
@@ -445,7 +464,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpPreviousMenu = m.currentActiveMenu
 			m.currentActiveMenu = renderView
 			m.renderView.GotoTop()
-			m.renderView.SetContent(buildRenderHelpText())
+				m.renderView.SetContent(buildRenderHelpText(m.style))
 			return m, nil
 		case "ctrl+c":
 			return m, tea.Quit
@@ -686,7 +705,7 @@ func (m *MezzotoneModel) View() string {
 	}
 
 	innerW := m.style.leftColumnWidth - 2
-	messageViewportRender := m.style.messageViewStyle.Width(m.style.leftColumnWidth).Render(m.messageViewPort.View())
+	messageViewportRender := m.style.messageViewStyle.renderStyle.Width(m.style.leftColumnWidth).Render(m.messageViewPort.View())
 
 	fpView := termtext.TruncateLinesANSI(m.filePicker.View(), innerW)
 	filePickerRender := m.style.filePickerStyle.renderStyle.Width(m.style.leftColumnWidth).Render(fpView)
@@ -754,62 +773,38 @@ func (m *MezzotoneModel) getRenderColor() bool {
 
 func (m *MezzotoneModel) incrementCurrentActiveMenu() {
 	m.currentActiveMenu++
-
-	var messageViewContent string
-	switch m.currentActiveMenu {
-	case filePickerMenu:
-		messageViewContent = "Select image or gif to convert:"
-		break
-	case renderOptionsMenu:
-		messageViewContent = "Edit render options and confirm:"
-		break
-	case renderView:
-		messageViewContent = "See export keybindings With h"
-		break
-	}
-
-	m.messageViewPort.SetContent(
-		termtext.TruncateLinesANSI(
-			messageViewContent+lipgloss.NewStyle().Faint(true).Render("\nPress h to toggle Help. Press esc to Quit."),
-			m.style.leftColumnWidth,
-		),
-	)
+	m.updateMessageTextOnMenuChange()
 }
 
 func (m *MezzotoneModel) decrementCurrentActiveMenu() {
 	m.currentActiveMenu--
+	m.updateMessageTextOnMenuChange()
+}
 
-	var messageViewContent string
+func (m *MezzotoneModel) updateMessageTextOnMenuChange() {
 	switch m.currentActiveMenu {
 	case filePickerMenu:
-		messageViewContent = "Select image gif or video to convert:"
+		m.updateMessageViewPortContent("Select image or gif to convert:", false)
 		break
 	case renderOptionsMenu:
-		messageViewContent = "Edit render options and confirm:"
+		m.updateMessageViewPortContent("Edit render options and confirm:", false)
 		break
 	case renderView:
-		messageViewContent = "Rendered image"
+		m.updateMessageViewPortContent("Press e for export options, f for fullscreen", false) //TODO export option screen
 		break
 	}
-
-	m.messageViewPort.SetContent(
-		termtext.TruncateLinesANSI(
-			messageViewContent+lipgloss.NewStyle().Faint(true).Render("\nPress h to toggle Help. Press esc to Quit."),
-			m.style.leftColumnWidth,
-		),
-	)
 }
 
 func (m *MezzotoneModel) updateMessageViewPortContent(messageViewContent string, isError bool) {
 	if isError {
-		messageViewContent = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("9")).
-			Render(messageViewContent)
+		messageViewContent = m.style.messageViewStyle.errorStyle.Render(messageViewContent)
+	} else {
+		messageViewContent = m.style.messageViewStyle.messageStyle.Render(messageViewContent)
 	}
 
 	m.messageViewPort.SetContent(
 		termtext.TruncateLinesANSI(
-			messageViewContent+lipgloss.NewStyle().Faint(true).Render("\nPress h to toggle Help. Press esc to Quit."),
+			lipgloss.JoinVertical(lipgloss.Top, messageViewContent, m.style.messageViewStyle.helpStyle.Render("\nPress h to toggle Help. Press esc to Quit.")),
 			m.style.leftColumnWidth,
 		),
 	)
