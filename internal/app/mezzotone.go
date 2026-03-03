@@ -742,15 +742,6 @@ func (m *MezzotoneModel) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Left, lefColumnRender, renderViewRender)
 }
 
-func (m *MezzotoneModel) safeFilePickerView() (out string) {
-	defer func() {
-		if recover() != nil {
-			out = "⚠ File picker view failed. Change directory or restart."
-		}
-	}()
-	return m.filePicker.View()
-}
-
 func normalizeRenderOptionsForService(settingsValues []ui.SettingItem) (services.RenderOptions, error) {
 	var textSize int
 	var fontAspect, edgeThreshold float64
