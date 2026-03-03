@@ -61,7 +61,7 @@ func TestMezzotoneModelHelpToggleRendersAndHidesHelp(t *testing.T) {
 	}
 
 	helpView := model.View()
-	if !strings.Contains(helpView, "MEZZOTONE HELP") {
+	if !strings.Contains(helpView, "CONTROLS") {
 		t.Fatalf("expected help overlay to render after pressing h")
 	}
 
@@ -72,7 +72,7 @@ func TestMezzotoneModelHelpToggleRendersAndHidesHelp(t *testing.T) {
 	}
 
 	viewWithoutHelp := model.View()
-	if strings.Contains(viewWithoutHelp, "MEZZOTONE HELP") {
+	if strings.Contains(viewWithoutHelp, "CONTROLS") {
 		t.Fatalf("expected help overlay to hide after pressing h again")
 	}
 }
