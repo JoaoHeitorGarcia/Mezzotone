@@ -11,8 +11,8 @@ func helpBinding(key, description string, keyStyle, descriptionStyle lipgloss.St
 }
 
 func buildRenderHelpText(style styleVariables) string {
-	sectionStyle := lipgloss.NewStyle().Foreground(style.styleColors.purple).Bold(true)
-	keyStyle := lipgloss.NewStyle().Foreground(style.styleColors.pink)
+	sectionStyle := lipgloss.NewStyle().Foreground(style.styleColors.primary).Bold(true)
+	keyStyle := lipgloss.NewStyle().Foreground(style.styleColors.selected)
 	descriptionStyle := lipgloss.NewStyle().Foreground(style.styleColors.white)
 	separatorString := "                                                                                   "
 	separator := lipgloss.NewStyle().Underline(true).Render(separatorString)
@@ -22,7 +22,7 @@ func buildRenderHelpText(style styleVariables) string {
 		"",
 		sectionStyle.Render("* Global"),
 		helpBinding("h", "Toggle help", keyStyle, descriptionStyle),
-		helpBinding("esc", "Back / Close help / Quit", keyStyle, descriptionStyle),
+		helpBinding("esc", "Back / Quit", keyStyle, descriptionStyle),
 		helpBinding("ctrl+c", "Quit", keyStyle, descriptionStyle),
 		"",
 		sectionStyle.Render("* File Picker"),
@@ -51,6 +51,7 @@ func buildRenderHelpText(style styleVariables) string {
 		helpBinding("shift+down", "Go To Top", keyStyle, descriptionStyle),
 		helpBinding("shift+left", "Go To Left", keyStyle, descriptionStyle),
 		helpBinding("shift+right", "Go To Right", keyStyle, descriptionStyle),
+		"",
 		helpBinding("c", "Copy to clipboard", keyStyle, descriptionStyle),
 		helpBinding("t", "Export to txt", keyStyle, descriptionStyle),
 		helpBinding("i", "Export to image", keyStyle, descriptionStyle),

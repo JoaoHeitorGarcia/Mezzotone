@@ -109,12 +109,12 @@ type messageViewStyle struct {
 }
 
 type styleColors struct {
-	white  lipgloss.Color
-	purple lipgloss.Color
-	pink   lipgloss.Color
-	gray   lipgloss.Color
-	black  lipgloss.Color
-	red    lipgloss.Color
+	white    lipgloss.Color
+	primary  lipgloss.Color
+	selected lipgloss.Color
+	gray     lipgloss.Color
+	black    lipgloss.Color
+	error    lipgloss.Color
 }
 
 var renderSettingsItemsSize int
@@ -137,12 +137,12 @@ const (
 
 func NewMezzotoneModel() *MezzotoneModel {
 	modelStyleColors := styleColors{
-		white:  lipgloss.Color("255"),
-		purple: lipgloss.Color("99"),
-		pink:   lipgloss.Color("213"),
-		gray:   lipgloss.Color("247"),
-		black:  lipgloss.Color("232"),
-		red:    lipgloss.Color("9"),
+		white:    lipgloss.Color("255"),
+		primary:  lipgloss.Color("99"),
+		selected: lipgloss.Color("213"),
+		gray:     lipgloss.Color("247"),
+		black:    lipgloss.Color("232"),
+		error:    lipgloss.Color("9"),
 	}
 
 	renderViewStyle := lipgloss.NewStyle().
@@ -151,9 +151,9 @@ func NewMezzotoneModel() *MezzotoneModel {
 	messageViewStyles := messageViewStyle{
 		renderStyle: lipgloss.NewStyle().
 			BorderStyle(lipgloss.NormalBorder()),
-		messageStyle: lipgloss.NewStyle().Foreground(modelStyleColors.pink),
+		messageStyle: lipgloss.NewStyle().Foreground(modelStyleColors.selected),
 		errorStyle: lipgloss.NewStyle().
-			Foreground(modelStyleColors.red),
+			Foreground(modelStyleColors.error),
 		helpStyle: lipgloss.NewStyle().
 			Faint(true),
 	}
@@ -164,14 +164,14 @@ func NewMezzotoneModel() *MezzotoneModel {
 			BorderStyle(lipgloss.NormalBorder()),
 		filePickerActiveStyle: filepicker.Styles{
 			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.gray),
-			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.pink),
-			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.purple),
-			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.purple),
+			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.selected),
+			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.primary),
+			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.primary),
 			File:             lipgloss.NewStyle().Foreground(modelStyleColors.white),
 			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.gray),
 			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.gray),
 			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.gray),
-			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.pink).Bold(true).Reverse(true),
+			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.selected).Bold(true).Reverse(true),
 			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.gray).Width(7).Align(lipgloss.Right),
 			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.gray).PaddingLeft(2).SetString(noFilesFoundString),
 		},
@@ -195,11 +195,11 @@ func NewMezzotoneModel() *MezzotoneModel {
 			BorderStyle(lipgloss.NormalBorder()).
 			Padding(1, 2),
 		settingsPanelActiveStyle: ui.RenderSettingsStyles{
-			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.purple),
+			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.primary),
 			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.white),
-			SelectedStyle:   lipgloss.NewStyle().Background(modelStyleColors.pink).Foreground(modelStyleColors.black).Bold(true),
-			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.pink).Bold(true),
-			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.pink).Bold(true),
+			SelectedStyle:   lipgloss.NewStyle().Background(modelStyleColors.selected).Foreground(modelStyleColors.black).Bold(true),
+			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.selected).Bold(true),
+			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.selected).Bold(true),
 		},
 		settingsPanelInactiveStyle: ui.RenderSettingsStyles{
 			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.gray),
@@ -464,7 +464,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpPreviousMenu = m.currentActiveMenu
 			m.currentActiveMenu = renderView
 			m.renderView.GotoTop()
-				m.renderView.SetContent(buildRenderHelpText(m.style))
+			m.renderView.SetContent(buildRenderHelpText(m.style))
 			return m, nil
 		case "ctrl+c":
 			return m, tea.Quit
@@ -790,7 +790,7 @@ func (m *MezzotoneModel) updateMessageTextOnMenuChange() {
 		m.updateMessageViewPortContent("Edit render options and confirm:", false)
 		break
 	case renderView:
-		m.updateMessageViewPortContent("Press e for export options, f for fullscreen", false) //TODO export option screen
+		m.updateMessageViewPortContent("Press f for fullscreen, see export options with h", false)
 		break
 	}
 }
