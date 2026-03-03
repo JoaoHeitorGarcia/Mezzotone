@@ -44,6 +44,7 @@ type MezzotoneModel struct {
 	helpPreviousMenu  int
 	isQuitting        bool
 	renderContent     string
+	exportFontTTFPath string
 
 	renderedImgOutput renderedImgOutput
 	renderedGifOutput renderedGifOutput
@@ -136,7 +137,15 @@ const (
 	renderView
 )
 
+type MezzotoneModelConfig struct {
+	ExportFontTTFPath string
+}
+
 func NewMezzotoneModel() *MezzotoneModel {
+	return NewMezzotoneModelWithConfig(MezzotoneModelConfig{})
+}
+
+func NewMezzotoneModelWithConfig(config MezzotoneModelConfig) *MezzotoneModel {
 	modelStyleColors := styleColors{
 		white:    lipgloss.Color("255"),
 		primary:  lipgloss.Color("99"),
@@ -270,6 +279,7 @@ func NewMezzotoneModel() *MezzotoneModel {
 		currentActiveMenu: filePickerMenu,
 		helpPreviousMenu:  filePickerMenu,
 		isQuitting:        false,
+		exportFontTTFPath: strings.TrimSpace(config.ExportFontTTFPath),
 	}
 	model.updateMessageViewPortContent("Select image or gif to convert:", false)
 
@@ -296,7 +306,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateMessageViewPortContent("⚠ "+msg.err.Error(), true)
 			return m, nil
 		}
-		m.updateMessageViewPortContent("Successfully exported to "+msg.outPath+" !", false)
+		m.updateMessageTextOnMenuChange()
 		return m, nil
 
 	case pngExportDoneMsg:
@@ -401,6 +411,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					DPI:          300,
 					BG:           color.Black,
 					FG:           color.White,
+					FontTTFPath:  m.exportFontTTFPath,
 					TargetAspect: targetAspect,
 					RenderColor:  m.getRenderColor(),
 				}
@@ -440,6 +451,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					DPI:          300,
 					BG:           color.Black,
 					FG:           color.White,
+					FontTTFPath:  m.exportFontTTFPath,
 					TargetAspect: targetAspect,
 					RenderColor:  m.getRenderColor(),
 				}
