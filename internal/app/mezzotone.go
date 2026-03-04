@@ -539,6 +539,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						var gifRuneArrays [][][]rune
 						var gifColorArrays [][][]color.NRGBA
+						var gifDelaysDuration []time.Duration
 						for i, frame := range frameArray {
 							runeArray, colorArray, err := services.ConvertImageToString(frame, normalizedOptions)
 							if err != nil {
@@ -548,10 +549,11 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							gifRuneArrays = append(gifRuneArrays, runeArray)
 							gifColorArrays = append(gifColorArrays, colorArray)
 
-							m.renderedGifOutput.renderedRunes = append(m.renderedGifOutput.renderedRunes, runeArray)
-							m.renderedGifOutput.renderedColor = append(m.renderedGifOutput.renderedColor, colorArray)
-							m.renderedGifOutput.delayTimes = append(m.renderedGifOutput.delayTimes, time.Duration(delays[i])*10*time.Millisecond)
+							gifDelaysDuration = append(gifDelaysDuration, time.Duration(delays[i])*10*time.Millisecond)
 						}
+						m.renderedGifOutput.renderedRunes = gifRuneArrays
+						m.renderedGifOutput.renderedColor = gifColorArrays
+						m.renderedGifOutput.delayTimes = gifDelaysDuration
 
 						var animationFrames []ui.AnimationFrame
 						for i, frameRuneArray := range gifRuneArrays {
