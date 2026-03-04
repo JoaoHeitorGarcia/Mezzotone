@@ -5,7 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/JoaoGarcia/Mezzotone/internal/termtext"
+	"Mezzotone/internal/termtext"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -28,6 +29,15 @@ type SettingItem struct {
 	Enum  []string
 }
 
+type RenderSettingsStyles struct {
+	BoxStyle        lipgloss.Style
+	TitleStyle      lipgloss.Style
+	LabelStyle      lipgloss.Style
+	ValueStyle      lipgloss.Style
+	SelectedStyle   lipgloss.Style
+	ConfirmBtnStyle lipgloss.Style
+}
+
 type SettingsPanel struct {
 	Title string
 	Items []SettingItem
@@ -40,17 +50,20 @@ type SettingsPanel struct {
 
 	input         textinput.Model
 	width, height int
+
+	Styles RenderSettingsStyles
 }
 
-func NewSettingsPanel(title string, items []SettingItem) SettingsPanel {
+func NewSettingsPanel(title string, items []SettingItem, styles RenderSettingsStyles) SettingsPanel {
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.CharLimit = 64
 
 	return SettingsPanel{
-		Title: title,
-		Items: items,
-		input: ti,
+		Title:  title,
+		Items:  items,
+		input:  ti,
+		Styles: styles,
 	}
 }
 
@@ -69,12 +82,21 @@ func (m *SettingsPanel) Update(msg tea.Msg) (SettingsPanel, tea.Cmd) {
 				m.Editing = false
 				m.input.Blur()
 				m.input.SetValue("")
-				m.Items[m.cursor].Value = m.beforeEdit
+				if it, ok := m.currentItem(); ok {
+					it.Value = m.beforeEdit
+				}
 				return *m, nil
 
 			case "enter":
 				raw := strings.TrimSpace(m.input.Value())
-				it := &m.Items[m.cursor]
+				it, ok := m.currentItem()
+				if !ok {
+					m.errMsg = ""
+					m.Editing = false
+					m.input.Blur()
+					m.input.SetValue("")
+					return *m, nil
+				}
 
 				if err := validateAndSet(it, raw); err != nil {
 					m.errMsg = err.Error()
@@ -137,7 +159,10 @@ func (m *SettingsPanel) Update(msg tea.Msg) (SettingsPanel, tea.Cmd) {
 			if m.cursor == len(m.Items) {
 				return *m, nil
 			}
-			it := &m.Items[m.cursor]
+			it, ok := m.currentItem()
+			if !ok {
+				return *m, nil
+			}
 
 			if it.Type == TypeBool {
 				m.toggleBool()
@@ -161,20 +186,6 @@ func (m *SettingsPanel) Update(msg tea.Msg) (SettingsPanel, tea.Cmd) {
 }
 
 func (m *SettingsPanel) View() string {
-	box := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		Padding(1, 2).
-		Width(m.width)
-
-	title := lipgloss.NewStyle().
-		Bold(true).
-		Render(strings.ToUpper(m.Title))
-
-	labelStyle := lipgloss.NewStyle()
-	valueStyle := lipgloss.NewStyle()
-
-	selected := lipgloss.NewStyle().Reverse(true)
-
 	innerW := max(1, m.width-2-4 /*border + padding left+right*/)
 	gapW := 2
 
@@ -182,7 +193,7 @@ func (m *SettingsPanel) View() string {
 	valueW := min(10, max(1, innerW/3))
 	labelW := max(1, innerW-gapW-valueW)
 
-	lines := []string{title, ""}
+	lines := []string{m.Styles.TitleStyle.Render(termtext.TruncateLinesANSI(strings.ToUpper(m.Title), labelW)), ""}
 
 	for i, it := range m.Items {
 		val := it.Value
@@ -191,26 +202,37 @@ func (m *SettingsPanel) View() string {
 			val = m.input.View()
 		}
 
-		left := labelStyle.MaxWidth(labelW).Width(labelW).Render(termtext.TruncateLinesANSI(it.Label, labelW))
-		right := valueStyle.Width(valueW).Render(val)
+		leftText := termtext.TruncateLinesANSI(it.Label, labelW)
+		rightText := termtext.TruncateLinesANSI(val, valueW)
+
+		left := m.Styles.LabelStyle.MaxWidth(labelW).Width(labelW).Render(leftText)
+		right := m.Styles.ValueStyle.Width(valueW).Render(rightText)
 
 		row := left + strings.Repeat(" ", gapW) + right
 		if i == m.cursor {
-			row = selected.Render(row)
+			left = lipgloss.NewStyle().MaxWidth(labelW).Width(labelW).Render(leftText)
+			right = lipgloss.NewStyle().Width(valueW).Render(rightText)
+			row = left + strings.Repeat(" ", gapW) + right
+			row = m.Styles.SelectedStyle.Render(row)
 		}
 		lines = append(lines, row)
 	}
 
-	confirmButton := labelStyle.Width(labelW + valueW).Render("CONFIRM")
+	confirmText := termtext.TruncateLinesANSI("CONFIRM", labelW)
+	confirmButton := m.Styles.ConfirmBtnStyle.Width(labelW + valueW).Render(confirmText)
 	if m.cursor == len(m.Items) {
-		confirmButton = selected.Render(confirmButton)
+		confirmButton = lipgloss.NewStyle().Width(labelW + valueW).Render(confirmText)
+		confirmButton = m.Styles.SelectedStyle.Render(confirmButton)
 	}
 	lines = append(lines, "\n"+confirmButton)
-	return box.Render(strings.Join(lines, "\n"))
+	return m.Styles.BoxStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (m *SettingsPanel) toggleBool() {
-	it := &m.Items[m.cursor]
+	it, ok := m.currentItem()
+	if !ok {
+		return
+	}
 	if it.Type != TypeBool {
 		return
 	}
@@ -223,7 +245,10 @@ func (m *SettingsPanel) toggleBool() {
 }
 
 func (m *SettingsPanel) stepEnum(dir int) {
-	it := &m.Items[m.cursor]
+	it, ok := m.currentItem()
+	if !ok {
+		return
+	}
 	if it.Type != TypeEnum || len(it.Enum) == 0 {
 		return
 	}
@@ -314,4 +339,11 @@ func (m *SettingsPanel) SetActive(i int) {
 
 func (m *SettingsPanel) ErrorMessage() string {
 	return m.errMsg
+}
+
+func (m *SettingsPanel) currentItem() (*SettingItem, bool) {
+	if m.cursor < 0 || m.cursor >= len(m.Items) {
+		return nil, false
+	}
+	return &m.Items[m.cursor], true
 }

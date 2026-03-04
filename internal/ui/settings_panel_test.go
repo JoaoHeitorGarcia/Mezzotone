@@ -3,17 +3,29 @@ package ui_test
 import (
 	"testing"
 
-	"github.com/JoaoGarcia/Mezzotone/internal/ui"
+	"Mezzotone/internal/ui"
+
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func newRenderSettingsPanelForTests() ui.SettingsPanel {
-	return ui.NewSettingsPanel("Render Options", []ui.SettingItem{
-		{Label: "Text Size", Key: "textSize", Type: ui.TypeInt, Value: "10"},
-		{Label: "Font Aspect", Key: "fontAspect", Type: ui.TypeFloat, Value: "2.3"},
-		{Label: "Directional Render", Key: "directionalRender", Type: ui.TypeBool, Value: "FALSE"},
-		{Label: "Rune Mode", Key: "runeMode", Type: ui.TypeEnum, Value: "ASCII", Enum: []string{"ASCII", "UNICODE", "DOTS"}},
-	})
+	return ui.NewSettingsPanel(
+		"Render Options",
+		[]ui.SettingItem{
+			{Label: "Text Size", Key: "textSize", Type: ui.TypeInt, Value: "10"},
+			{Label: "Font Aspect", Key: "fontAspect", Type: ui.TypeFloat, Value: "2.3"},
+			{Label: "Directional Render", Key: "directionalRender", Type: ui.TypeBool, Value: "FALSE"},
+			{Label: "Rune Mode", Key: "runeMode", Type: ui.TypeEnum, Value: "ASCII", Enum: []string{"ASCII", "UNICODE", "DOTS"}},
+		},
+		ui.RenderSettingsStyles{
+			LabelStyle:      lipgloss.NewStyle(),
+			ValueStyle:      lipgloss.NewStyle(),
+			SelectedStyle:   lipgloss.NewStyle(),
+			TitleStyle:      lipgloss.NewStyle(),
+			ConfirmBtnStyle: lipgloss.NewStyle(),
+		},
+	)
 }
 
 func TestSettingsPanelConfirmFlagTracksConfirmRow(t *testing.T) {

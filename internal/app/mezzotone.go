@@ -8,14 +8,17 @@ import (
 	"image/gif"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/JoaoGarcia/Mezzotone/internal/export"
-	"github.com/JoaoGarcia/Mezzotone/internal/services"
-	"github.com/JoaoGarcia/Mezzotone/internal/termtext"
-	"github.com/JoaoGarcia/Mezzotone/internal/ui"
+	"Mezzotone/internal/export"
+	"Mezzotone/internal/services"
+	"Mezzotone/internal/termtext"
+	"Mezzotone/internal/ui"
+
 	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -24,12 +27,6 @@ import (
 	"github.com/google/uuid"
 	"golang.design/x/clipboard"
 )
-
-// TODO REORDER Layout IF TERMINAL width < height
-// FIXME for some fontsize image gets cut on right/bottom - DONE
-// TODO add fullscreen to renderview - DONE
-// TODO add color toggle (current is no color)
-// todo make it ⭐prettier⭐
 
 type MezzotoneModel struct {
 	filePicker   filepicker.Model
@@ -45,8 +42,12 @@ type MezzotoneModel struct {
 	currentActiveMenu int
 	helpVisible       bool
 	helpPreviousMenu  int
+	isQuitting        bool
 	renderContent     string
-	asciiGIFFrames    []ui.AnimationFrame
+	exportFontTTFPath string
+
+	renderedImgOutput renderedImgOutput
+	renderedGifOutput renderedGifOutput
 
 	gifAnimation ui.AnimationRenderer
 
@@ -66,14 +67,69 @@ type pngExportDoneMsg struct {
 	err     error
 }
 
+type renderedImgOutput struct {
+	renderedRunes [][]rune
+	renderedColor [][]color.NRGBA
+}
+
+type renderedGifOutput struct {
+	renderedRunes [][][]rune
+	renderedColor [][][]color.NRGBA
+	delayTimes    []time.Duration
+}
+
 type styleVariables struct {
 	windowMargin           int
 	leftColumnWidth        int
 	isRenderViewFullscreen bool
+
+	styleColors styleColors
+
+	renderViewStyle     lipgloss.Style
+	filePickerStyle     filePickerStyle
+	renderSettingsStyle renderSettingsStyle
+	messageViewStyle    messageViewStyle
+}
+
+type filePickerStyle struct {
+	renderStyle             lipgloss.Style
+	filePickerActiveStyle   filepicker.Styles
+	filePickerInactiveStyle filepicker.Styles
+}
+
+type renderSettingsStyle struct {
+	renderStyle                lipgloss.Style
+	settingsPanelActiveStyle   ui.RenderSettingsStyles
+	settingsPanelInactiveStyle ui.RenderSettingsStyles
+}
+
+type messageViewStyle struct {
+	renderStyle  lipgloss.Style
+	messageStyle lipgloss.Style
+	errorStyle   lipgloss.Style
+	helpStyle    lipgloss.Style
+}
+
+type styleColors struct {
+	white    lipgloss.Color
+	primary  lipgloss.Color
+	selected lipgloss.Color
+	gray     lipgloss.Color
+	black    lipgloss.Color
+	error    lipgloss.Color
 }
 
 var renderSettingsItemsSize int
+var currentMessage string
+
 var clipboardOK bool
+var clipboardWrite = clipboard.Write
+var clipboardCommands = [][]string{
+	{"wl-copy"},
+	{"xclip", "-selection", "clipboard"},
+	{"xsel", "--clipboard", "--input"},
+}
+
 var newUUID = uuid.New
 
 const (
@@ -82,11 +138,100 @@ const (
 	renderView
 )
 
+type MezzotoneModelConfig struct {
+	ExportFontTTFPath string
+}
+
 func NewMezzotoneModel() *MezzotoneModel {
+	return NewMezzotoneModelWithConfig(MezzotoneModelConfig{})
+}
+
+func NewMezzotoneModelWithConfig(config MezzotoneModelConfig) *MezzotoneModel {
+	modelStyleColors := styleColors{
+		white:    lipgloss.Color("255"),
+		primary:  lipgloss.Color("99"),
+		selected: lipgloss.Color("213"),
+		gray:     lipgloss.Color("247"),
+		black:    lipgloss.Color("232"),
+		error:    lipgloss.Color("9"),
+	}
+
+	renderViewStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.NormalBorder())
+
+	messageViewStyles := messageViewStyle{
+		renderStyle: lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()),
+		messageStyle: lipgloss.NewStyle().Foreground(modelStyleColors.selected),
+		errorStyle: lipgloss.NewStyle().
+			Foreground(modelStyleColors.error),
+		helpStyle: lipgloss.NewStyle().
+			Faint(true),
+	}
+
+	noFilesFoundString := "Oops. No Files Found."
+	filePickerStyles := filePickerStyle{
+		renderStyle: lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()),
+		filePickerActiveStyle: filepicker.Styles{
+			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.selected),
+			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.primary),
+			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.primary),
+			File:             lipgloss.NewStyle().Foreground(modelStyleColors.white),
+			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.selected).Bold(true).Reverse(true),
+			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.gray).Width(7).Align(lipgloss.Right),
+			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.gray).PaddingLeft(2).SetString(noFilesFoundString),
+		},
+		filePickerInactiveStyle: filepicker.Styles{
+			DisabledCursor:   lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Cursor:           lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Symlink:          lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Directory:        lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			File:             lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			DisabledFile:     lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			DisabledSelected: lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Permission:       lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			Selected:         lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			FileSize:         lipgloss.NewStyle().Foreground(modelStyleColors.gray).Width(7).Align(lipgloss.Right),
+			EmptyDirectory:   lipgloss.NewStyle().Foreground(modelStyleColors.gray).PaddingLeft(2).SetString(noFilesFoundString),
+		},
+	}
+
+	renderSettingsStyles := renderSettingsStyle{
+		renderStyle: lipgloss.NewStyle().
+			BorderStyle(lipgloss.NormalBorder()).
+			Padding(1, 2),
+		settingsPanelActiveStyle: ui.RenderSettingsStyles{
+			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.primary),
+			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.white),
+			SelectedStyle:   lipgloss.NewStyle().Background(modelStyleColors.selected).Foreground(modelStyleColors.black).Bold(true),
+			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.selected).Bold(true),
+			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.selected).Bold(true),
+		},
+		settingsPanelInactiveStyle: ui.RenderSettingsStyles{
+			LabelStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			ValueStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			SelectedStyle:   lipgloss.NewStyle().Foreground(modelStyleColors.gray).Reverse(true),
+			TitleStyle:      lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+			ConfirmBtnStyle: lipgloss.NewStyle().Foreground(modelStyleColors.gray),
+		},
+	}
+
 	windowStyles := styleVariables{
 		windowMargin:           2,
 		leftColumnWidth:        10,
 		isRenderViewFullscreen: false,
+
+		styleColors: modelStyleColors,
+
+		renderViewStyle:     renderViewStyle,
+		messageViewStyle:    messageViewStyles,
+		filePickerStyle:     filePickerStyles,
+		renderSettingsStyle: renderSettingsStyles,
 	}
 
 	runeMode := []string{"ASCII", "UNICODE", "DOTS", "RECTANGLES", "BARS"}
@@ -97,10 +242,11 @@ func NewMezzotoneModel() *MezzotoneModel {
 		{Label: "Edge Threshold", Key: "edgeThreshold", Type: ui.TypeFloat, Value: "0.6"},
 		{Label: "Reverse Chars", Key: "reverseChars", Type: ui.TypeBool, Value: "TRUE"},
 		{Label: "High Contrast", Key: "highContrast", Type: ui.TypeBool, Value: "TRUE"},
+		{Label: "Render Color", Key: "renderColor", Type: ui.TypeBool, Value: "FALSE"},
 		{Label: "Rune Mode", Key: "runeMode", Type: ui.TypeEnum, Value: "ASCII", Enum: runeMode},
 	}
 	renderSettingsItemsSize = len(renderSettingsItems)
-	renderSettingsModel := ui.NewSettingsPanel("Render Options", renderSettingsItems)
+	renderSettingsModel := ui.NewSettingsPanel("Render Options", renderSettingsItems, windowStyles.renderSettingsStyle.settingsPanelInactiveStyle)
 	renderSettingsModel.ClearActive()
 
 	fp := filepicker.New()
@@ -117,21 +263,24 @@ func NewMezzotoneModel() *MezzotoneModel {
 		Open:     key.NewBinding(key.WithKeys("right", "enter"), key.WithHelp("l", "open")),
 		Select:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
 	}
+	fp.Styles = windowStyles.filePickerStyle.filePickerActiveStyle
 
-	renderView := viewport.New(0, 0)
+	renderViewPort := viewport.New(0, 0)
 	leftColumn := viewport.New(0, 0)
 
 	messageViewPort := viewport.New(0, 3)
 
 	model := &MezzotoneModel{
 		filePicker:        fp,
-		renderView:        renderView,
+		renderView:        renderViewPort,
 		messageViewPort:   messageViewPort,
 		style:             windowStyles,
 		leftColumn:        leftColumn,
 		renderSettings:    renderSettingsModel,
 		currentActiveMenu: filePickerMenu,
 		helpPreviousMenu:  filePickerMenu,
+		isQuitting:        false,
+		exportFontTTFPath: strings.TrimSpace(config.ExportFontTTFPath),
 	}
 	model.updateMessageViewPortContent("Select image or gif to convert:", false)
 
@@ -158,7 +307,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateMessageViewPortContent("⚠ "+msg.err.Error(), true)
 			return m, nil
 		}
-		m.updateMessageViewPortContent("Successfully exported to "+msg.outPath+" !", false)
+		m.updateMessageTextOnMenuChange()
 		return m, nil
 
 	case pngExportDoneMsg:
@@ -201,20 +350,25 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.filePicker.SetHeight(computedFilePickerHeight)
 
 		m.toggleRenderViewFullscreen()
-		m.updateMessageViewPortContent("Select image or gif to convert:", false)
+		m.updateMessageViewPortContent(currentMessage, false)
 
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.style.isRenderViewFullscreen && msg.String() != "f" && msg.String() != "ctrl+c" {
+			return m, nil
+		}
+		if m.currentActiveMenu == filePickerMenu && m.isQuitting && msg.Type != tea.KeyEsc {
+			m.isQuitting = false
+			m.updateMessageViewPortContent("Select image or gif to convert:", false)
+		}
 		switch msg.String() {
 		case "c":
 			if m.currentActiveMenu == renderView {
-				if !clipboardOK {
-					m.updateMessageViewPortContent("Clipboard not available (init failed)", true)
+				if err := copyTextToClipboard(m.renderContent); err != nil {
+					m.updateMessageViewPortContent("⚠ "+err.Error(), true)
 					return m, nil
 				}
-
-				clipboard.Write(clipboard.FmtText, []byte(m.renderContent))
 				m.updateMessageViewPortContent("Successfully sent to clipboard !", false)
 				return m, nil
 			}
@@ -226,17 +380,16 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				generatedUuid := newUUID()
-				outPpath := filepath.Join(homeDir, "Mezzotone_"+generatedUuid.String()+".txt")
+				outPath := filepath.Join(homeDir, "Mezzotone_"+generatedUuid.String()+".txt")
 
-				err = export.ASCIItToTxT(outPpath, m.renderContent)
+				err = export.ASCIItToTxT(outPath, m.renderContent)
 				if err != nil {
 					m.updateMessageViewPortContent("⚠ "+err.Error(), true)
 					return m, nil
 				}
 
-				m.updateMessageViewPortContent("Successfully exported to "+outPpath+" !", false)
+				m.updateMessageViewPortContent("Successfully exported to "+outPath+" !", false)
 				return m, nil
-
 			}
 		case "i":
 			if m.currentActiveMenu == renderView {
@@ -259,10 +412,24 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					DPI:          300,
 					BG:           color.Black,
 					FG:           color.White,
+					FontTTFPath:  m.exportFontTTFPath,
 					TargetAspect: targetAspect,
+					RenderColor:  m.getRenderColor(),
 				}
+
 				m.updateMessageViewPortContent("Exporting image to "+outPath+" ...", false)
-				return m, exportAsciiToPngCmd(outPath, m.renderContent, exportOptions)
+
+				var render renderedImgOutput
+				if m.renderedImgOutput.renderedRunes == nil {
+					i := m.gifAnimation.GetcurrentFrameIndex()
+					render = renderedImgOutput{
+						renderedRunes: m.renderedGifOutput.renderedRunes[i],
+						renderedColor: m.renderedGifOutput.renderedColor[i],
+					}
+				} else {
+					render = m.renderedImgOutput
+				}
+				return m, exportAsciiToPngCmd(outPath, render, exportOptions)
 			}
 		case "g":
 			if m.currentActiveMenu == renderView {
@@ -285,18 +452,22 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					DPI:          300,
 					BG:           color.Black,
 					FG:           color.White,
+					FontTTFPath:  m.exportFontTTFPath,
 					TargetAspect: targetAspect,
+					RenderColor:  m.getRenderColor(),
 				}
 
-				gifFrames := make([]export.ASCIIGIFFrame, 0, len(m.asciiGIFFrames))
-				for _, frame := range m.asciiGIFFrames {
+				gifFrames := make([]export.ASCIIGIFFrame, 0, len(m.renderedGifOutput.renderedRunes))
+				for i := range m.renderedGifOutput.renderedRunes {
 					gifFrames = append(gifFrames, export.ASCIIGIFFrame{
-						ASCII:    frame.Frame,
-						Duration: frame.Duration,
+						FrameRunes:  m.renderedGifOutput.renderedRunes[i],
+						Duration:    m.renderedGifOutput.delayTimes[i],
+						FrameColors: m.renderedGifOutput.renderedColor[i],
 					})
 				}
+
 				m.updateMessageViewPortContent("Exporting gif to "+outPath+" ...", false)
-				return m, exportAsciiToGifCmd(outPath, m.renderContent, gifFrames, exportOptions)
+				return m, exportAsciiToGifCmd(outPath, gifFrames, exportOptions)
 			}
 		case "h":
 			if m.currentActiveMenu == renderOptionsMenu && m.renderSettings.Editing {
@@ -312,7 +483,7 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpPreviousMenu = m.currentActiveMenu
 			m.currentActiveMenu = renderView
 			m.renderView.GotoTop()
-			m.renderView.SetContent(buildRenderHelpText())
+			m.renderView.SetContent(buildRenderHelpText(m.style))
 			return m, nil
 		case "ctrl+c":
 			return m, tea.Quit
@@ -324,8 +495,12 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.currentActiveMenu == filePickerMenu {
-				//TODO ask for confimation
-				return m, tea.Quit
+				if m.isQuitting {
+					return m, tea.Quit
+				}
+				m.isQuitting = true
+				m.updateMessageViewPortContent("Press esc again to quit", false)
+				return m, nil
 			}
 			if m.currentActiveMenu == renderOptionsMenu {
 				if !m.renderSettings.Editing {
@@ -363,20 +538,27 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.updateMessageViewPortContent("⚠ "+err.Error(), true)
 							return m, cmd
 						}
-
 						var gifRuneArrays [][][]rune
-						for _, frame := range frameArray {
-							runeArray, err := services.ConvertImageToString(frame, normalizedOptions)
+						var gifColorArrays [][][]color.NRGBA
+						var gifDelaysDuration []time.Duration
+						for i, frame := range frameArray {
+							runeArray, colorArray, err := services.ConvertImageToString(frame, normalizedOptions)
 							if err != nil {
 								m.updateMessageViewPortContent("⚠ "+err.Error(), true)
 								return m, cmd
 							}
 							gifRuneArrays = append(gifRuneArrays, runeArray)
+							gifColorArrays = append(gifColorArrays, colorArray)
+
+							gifDelaysDuration = append(gifDelaysDuration, time.Duration(delays[i])*10*time.Millisecond)
 						}
+						m.renderedGifOutput.renderedRunes = gifRuneArrays
+						m.renderedGifOutput.renderedColor = gifColorArrays
+						m.renderedGifOutput.delayTimes = gifDelaysDuration
 
 						var animationFrames []ui.AnimationFrame
 						for i, frameRuneArray := range gifRuneArrays {
-							frameASCII := services.ImageRuneArrayIntoString(frameRuneArray)
+							frameASCII := services.ImageRuneArrayIntoString(frameRuneArray, gifColorArrays[i], normalizedOptions.RenderColor)
 							animationFrames = append(
 								animationFrames,
 								ui.AnimationFrame{
@@ -390,9 +572,10 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						var escapeKeys []string
 						escapeKeys = append(escapeKeys, "esc")
 						gifAnimation := ui.NewAnimationRenderer(animationFrames, escapeKeys)
-
 						m.gifAnimation = gifAnimation
-						m.asciiGIFFrames = animationFrames
+
+						m.renderedImgOutput.renderedRunes = nil
+						m.renderedImgOutput.renderedColor = nil
 
 						return m, m.gifAnimation.StartAnimation
 					}
@@ -405,15 +588,18 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					_ = services.Logger().Info(fmt.Sprintf("format: %s", format))
 
-					runeArray, err := services.ConvertImageToString(inputImg, normalizedOptions)
+					runeArray, colorArray, err := services.ConvertImageToString(inputImg, normalizedOptions)
 					if err != nil {
 						m.updateMessageViewPortContent("⚠ "+err.Error(), true)
 						return m, cmd
 					}
 
+					m.renderedImgOutput.renderedRunes = runeArray
+					m.renderedImgOutput.renderedColor = colorArray
+
 					m.gifAnimation.StopAnimation()
-					m.asciiGIFFrames = nil
-					m.renderContent = services.ImageRuneArrayIntoString(runeArray)
+
+					m.renderContent = services.ImageRuneArrayIntoString(runeArray, colorArray, normalizedOptions.RenderColor)
 					_ = services.Logger().Info(fmt.Sprintf("%s", m.renderContent))
 
 					if !m.helpVisible {
@@ -528,138 +714,116 @@ func (m *MezzotoneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *MezzotoneModel) View() string {
+	switch m.currentActiveMenu {
+	case renderView:
+		m.filePicker.Styles = m.style.filePickerStyle.filePickerInactiveStyle
+		m.renderSettings.Styles = m.style.renderSettingsStyle.settingsPanelInactiveStyle
+	case renderOptionsMenu:
+		m.filePicker.Styles = m.style.filePickerStyle.filePickerInactiveStyle
+		m.renderSettings.Styles = m.style.renderSettingsStyle.settingsPanelActiveStyle
+	case filePickerMenu:
+		m.filePicker.Styles = m.style.filePickerStyle.filePickerActiveStyle
+		m.renderSettings.Styles = m.style.renderSettingsStyle.settingsPanelInactiveStyle
+	}
 
 	if m.style.isRenderViewFullscreen {
-		renderViewStyle := lipgloss.NewStyle().
-			BorderStyle(lipgloss.NormalBorder())
-		return renderViewStyle.Render(m.renderView.View())
+		return m.style.renderViewStyle.Render(m.renderView.View())
 	}
 
 	innerW := m.style.leftColumnWidth - 2
-	messageViewportRenderStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		Width(m.style.leftColumnWidth)
-	messageViewportRender := messageViewportRenderStyle.Render(m.messageViewPort.View())
+	messageViewportRender := m.style.messageViewStyle.renderStyle.Width(m.style.leftColumnWidth).Render(m.messageViewPort.View())
 
-	filePickerStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder()).
-		Width(m.style.leftColumnWidth)
 	fpView := termtext.TruncateLinesANSI(m.filePicker.View(), innerW)
-	filePickerRender := filePickerStyle.Render(fpView)
+	filePickerRender := m.style.filePickerStyle.renderStyle.Width(m.style.leftColumnWidth).Render(fpView)
 
-	lefColumnRender := lipgloss.JoinVertical(lipgloss.Top, messageViewportRender, filePickerRender, m.renderSettings.View())
+	renderSettingsRender := m.style.renderSettingsStyle.renderStyle.Width(m.style.leftColumnWidth).Render(m.renderSettings.View())
 
-	renderViewStyle := lipgloss.NewStyle().
-		BorderStyle(lipgloss.NormalBorder())
-	renderViewRender := renderViewStyle.Render(m.renderView.View())
+	lefColumnRender := lipgloss.JoinVertical(lipgloss.Top, messageViewportRender, filePickerRender, renderSettingsRender)
+
+	renderViewRender := m.style.renderViewStyle.Render(m.renderView.View())
 
 	return lipgloss.JoinHorizontal(lipgloss.Left, lefColumnRender, renderViewRender)
-}
-
-func (m *MezzotoneModel) safeFilePickerView() (out string) {
-	defer func() {
-		if recover() != nil {
-			out = "⚠ File picker view failed. Change directory or restart."
-		}
-	}()
-	return m.filePicker.View()
 }
 
 func normalizeRenderOptionsForService(settingsValues []ui.SettingItem) (services.RenderOptions, error) {
 	var textSize int
 	var fontAspect, edgeThreshold float64
-	var directionalRender, reverseChars, highContrast bool
+	var directionalRender, reverseChars, highContrast, renderColor bool
 	var runeMode string
 
 	for _, item := range settingsValues {
 		switch item.Key {
 		case "textSize":
 			textSize, _ = strconv.Atoi(item.Value)
-
 		case "fontAspect":
 			fontAspect, _ = strconv.ParseFloat(item.Value, 2)
-
 		case "edgeThreshold":
 			edgeThreshold, _ = strconv.ParseFloat(item.Value, 2)
-
 		case "directionalRender":
 			directionalRender, _ = strconv.ParseBool(item.Value)
-
 		case "reverseChars":
 			reverseChars, _ = strconv.ParseBool(item.Value)
-
 		case "highContrast":
 			highContrast, _ = strconv.ParseBool(item.Value)
-
+		case "renderColor":
+			renderColor, _ = strconv.ParseBool(item.Value)
 		case "runeMode":
 			runeMode = item.Value
 		}
 	}
-	options, err := services.NewRenderOptions(textSize, fontAspect, directionalRender, edgeThreshold, reverseChars, highContrast, runeMode)
+	options, err := services.NewRenderOptions(textSize, fontAspect, directionalRender, edgeThreshold, reverseChars, highContrast, renderColor, runeMode)
 	if err != nil {
 		return services.RenderOptions{}, err
 	}
 	return options, nil
 }
 
+func (m *MezzotoneModel) getRenderColor() bool {
+	for _, item := range m.renderSettings.Items {
+		if item.Key == "renderColor" {
+			value, _ := strconv.ParseBool(item.Value)
+			return value
+		}
+	}
+	return false
+}
+
 func (m *MezzotoneModel) incrementCurrentActiveMenu() {
 	m.currentActiveMenu++
-
-	var messageViewContent string
-	switch m.currentActiveMenu {
-	case filePickerMenu:
-		messageViewContent = "Select image or gif to convert:"
-		break
-	case renderOptionsMenu:
-		messageViewContent = "Edit render options and confirm:"
-		break
-	case renderView:
-		messageViewContent = "See export keybindings With h"
-		break
-	}
-
-	m.messageViewPort.SetContent(
-		termtext.TruncateLinesANSI(
-			messageViewContent+lipgloss.NewStyle().Faint(true).Render("\nPress h to toggle Help. Press esc to Quit."),
-			m.style.leftColumnWidth,
-		),
-	)
+	m.updateMessageTextOnMenuChange()
 }
 
 func (m *MezzotoneModel) decrementCurrentActiveMenu() {
 	m.currentActiveMenu--
+	m.updateMessageTextOnMenuChange()
+}
 
-	var messageViewContent string
+func (m *MezzotoneModel) updateMessageTextOnMenuChange() {
 	switch m.currentActiveMenu {
 	case filePickerMenu:
-		messageViewContent = "Select image gif or video to convert:"
+		m.updateMessageViewPortContent("Select image or gif to convert:", false)
 		break
 	case renderOptionsMenu:
-		messageViewContent = "Edit render options and confirm:"
+		m.updateMessageViewPortContent("Edit render options and confirm:", false)
 		break
 	case renderView:
-		messageViewContent = "Rendered image"
+		m.updateMessageViewPortContent("Press f for fullscreen, see export options with h", false)
 		break
 	}
-
-	m.messageViewPort.SetContent(
-		termtext.TruncateLinesANSI(
-			messageViewContent+lipgloss.NewStyle().Faint(true).Render("\nPress h to toggle Help. Press esc to Quit."),
-			m.style.leftColumnWidth,
-		),
-	)
 }
 
 func (m *MezzotoneModel) updateMessageViewPortContent(messageViewContent string, isError bool) {
+	currentMessage = messageViewContent
+
 	if isError {
-		messageViewContent = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("9")).
-			Render(messageViewContent)
+		messageViewContent = m.style.messageViewStyle.errorStyle.Render(messageViewContent)
+	} else {
+		messageViewContent = m.style.messageViewStyle.messageStyle.Render(messageViewContent)
 	}
 
 	m.messageViewPort.SetContent(
 		termtext.TruncateLinesANSI(
-			messageViewContent+lipgloss.NewStyle().Faint(true).Render("\nPress h to toggle Help. Press esc to Quit."),
+			lipgloss.JoinVertical(lipgloss.Top, messageViewContent, m.style.messageViewStyle.helpStyle.Render("\nPress h to toggle Help. Press esc to Quit.")),
 			m.style.leftColumnWidth,
 		),
 	)
@@ -680,8 +844,8 @@ func IsGIF(path string) bool {
 	return format == "gif"
 }
 
-// SplitAnimatedGIF decodes an animated GIF and returns frames plus per-frame delays.
-// GIF frames are often partial/offset “patches”, so we simulate playback by drawing each frame onto a
+// SplitAnimatedGIF decodes an animated GIF and returns frames plus per-frame delayTimes.
+// GIF frames are often partial/offset “patches”, so playback is simulated by drawing each frame onto a
 // full-size RGBA canvas and then clone the canvas after each draw so frames don’t share the same pixel buffer.
 func SplitAnimatedGIF(r io.Reader) (frames []image.Image, delays []int, err error) {
 	defer func() {
@@ -752,7 +916,7 @@ func cloneRGBA(src *image.RGBA) *image.RGBA {
 	return dst
 }
 
-func exportAsciiToGifCmd(outPath, renderContent string, frames []export.ASCIIGIFFrame, exportOptions export.ASCIIExportOptions) tea.Cmd {
+func exportAsciiToGifCmd(outPath string, frames []export.ASCIIGIFFrame, exportOptions export.ASCIIExportOptions) tea.Cmd {
 	return func() (msg tea.Msg) {
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -763,16 +927,14 @@ func exportAsciiToGifCmd(outPath, renderContent string, frames []export.ASCIIGIF
 			}
 		}()
 
-		var err error
 		if len(frames) == 0 {
-			frames = []export.ASCIIGIFFrame{
-				{
-					ASCII:    renderContent,
-					Duration: 100 * time.Millisecond,
-				},
+			return gifExportDoneMsg{
+				outPath: outPath,
+				err:     fmt.Errorf("no rendered gif frames available to export"),
 			}
 		}
-		err = export.ASCIIFramesToGIF(frames, outPath, exportOptions)
+
+		err := export.ASCIIFramesToGIF(frames, outPath, exportOptions)
 
 		msg = gifExportDoneMsg{
 			outPath: outPath,
@@ -782,7 +944,7 @@ func exportAsciiToGifCmd(outPath, renderContent string, frames []export.ASCIIGIF
 	}
 }
 
-func exportAsciiToPngCmd(outPath, renderContent string, exportOptions export.ASCIIExportOptions) tea.Cmd {
+func exportAsciiToPngCmd(outPath string, imgOutput renderedImgOutput, exportOptions export.ASCIIExportOptions) tea.Cmd {
 	return func() (msg tea.Msg) {
 		defer func() {
 			if rec := recover(); rec != nil {
@@ -793,13 +955,39 @@ func exportAsciiToPngCmd(outPath, renderContent string, exportOptions export.ASC
 			}
 		}()
 
-		err := export.ASCIIToPNG(renderContent, outPath, exportOptions)
+		err := export.ASCIIToPNG(imgOutput.renderedRunes, imgOutput.renderedColor, outPath, exportOptions)
 		msg = pngExportDoneMsg{
 			outPath: outPath,
 			err:     err,
 		}
 		return msg
 	}
+}
+
+func copyTextToClipboard(content string) error {
+	cleanContent := content
+	if len(cleanContent) == 0 {
+		return fmt.Errorf("nothing to copy (render output is empty)")
+	}
+
+	if clipboardOK {
+		if changed := clipboardWrite(clipboard.FmtText, []byte(cleanContent)); changed != nil {
+			return nil
+		}
+	}
+
+	for _, command := range clipboardCommands {
+		if len(command) == 0 {
+			continue
+		}
+		cmd := exec.Command(command[0], command[1:]...)
+		cmd.Stdin = strings.NewReader(cleanContent)
+		if err := cmd.Run(); err == nil {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("clipboard not available (init failed)")
 }
 
 func (m *MezzotoneModel) toggleRenderViewFullscreen() {
