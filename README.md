@@ -1,4 +1,4 @@
-[![Version](https://img.shields.io/badge/Version-v1.0.2-blue.svg)](https://github.com/JoaoHeitorGarcia/Mezzotone/releases)
+[![Version](https://img.shields.io/badge/Version-v1.1.0-blue.svg)](https://github.com/JoaoHeitorGarcia/Mezzotone/releases)
 [![Powered by Bubble Tea](https://img.shields.io/badge/Powered_by-Bubble_Tea-7a4a8f)](https://github.com/charmbracelet/bubbletea)
 [![Powered by Go](https://img.shields.io/badge/Powered_by-Go-7a4a8f)](https://github.com/golang/go)
 
@@ -134,10 +134,10 @@ Original
 #### Gif
 Original:
 
-![test](https://github.com/user-attachments/assets/4a6960b2-7f2c-4f80-982c-8384745f8ede)
+![test](https://github.com/user-attachments/assets/8a9e654b-354b-4aae-a3a2-0bd2a96a0ade)
 
 Output:
 
-![Mezzotone_6507e041-9f42-40f4-9170-06ef19ec7953](https://github.com/user-attachments/assets/ba33fd23-2189-45a6-8770-7a6077c4b94d)
-![Mezzotone_209ab167-3815-4c00-b37d-f904891540a9](https://github.com/user-attachments/assets/92a30f34-43bf-4866-aa51-a68c13002f89)
+![Mezzotone_b594ace5-b402-4d52-8786-d909c741bcb9](https://github.com/user-attachments/assets/11ee0c34-0724-4e2a-be84-a7fa48c68a9e)
+![Mezzotone_8c87d3ae-26d1-46cd-bb07-1f164428aacb](https://github.com/user-attachments/assets/2896d241-b292-4308-8e85-1eed11361976)
 
